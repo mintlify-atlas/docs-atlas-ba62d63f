@@ -1,0 +1,114 @@
+{
+  "projectType": "saas",
+  "projectName": "Cloro de Hidalgo Procurement System",
+  "projectDescription": "Enterprise procurement management system for tracking purchase requisitions, supplier deliveries, and raw material inventory for Cloro de Hidalgo.",
+  "theme": "linden",
+  "primaryColor": "#efc036",
+  "lightColor": "#485985",
+  "darkColor": "#616467",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "authentication"
+            ]
+          },
+          {
+            "group": "User Guides",
+            "pages": [
+              "guides/admin-guide",
+              "guides/coordinator-guide",
+              "guides/laboratory-guide",
+              "guides/cedis-guide"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/requisitions",
+              "features/calendar",
+              "features/catalogs",
+              "features/status-tracking",
+              "features/audit-history"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Database",
+        "groups": [
+          {
+            "group": "Schema",
+            "pages": [
+              "database/overview",
+              "database/tables",
+              "database/relationships"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "database/row-level-security",
+              "database/roles"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Setup",
+            "pages": [
+              "development/installation",
+              "development/environment",
+              "development/supabase-setup"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "development/project-structure",
+              "development/components",
+              "development/server-actions"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "development/deployment",
+              "development/customization"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-role authentication system (Admin, Coordinator, Laboratory, CEDIS)",
+    "Purchase requisition management with full lifecycle tracking",
+    "Interactive calendar view for delivery scheduling",
+    "Master catalogs for suppliers, products, presentations, and destinations",
+    "Status tracking with visual color coding",
+    "Audit history for all requisition changes",
+    "Row-level security with Supabase",
+    "Real-time data synchronization"
+  ],
+  "publicApiSurface": [
+    "createRequisicion(data: RequisicionFormData)",
+    "updateRequisicion(id: string, data: Partial<RequisicionFormData>)",
+    "deleteRequisicion(id: string)",
+    "getRequisiciones(filters?: RequisicionFilters)",
+    "getCatalogos()",
+    "updateCatalogo(type: string, id: string, data: object)",
+    "getUserProfile(userId: string)",
+    "updateUserRole(userId: string, role: UserRole)",
+    "getRequisicionHistorial(requisicionId: string)"
+  ]
+}
