@@ -7,6 +7,10 @@ description: 'Role-based access control and permissions system'
 
 The Cloro de Hidalgo Procurement System implements a **three-tier role hierarchy** using PostgreSQL enums and Row Level Security policies. Roles determine what users can view, create, modify, and delete.
 
+<Warning>
+**Schema Mismatch Note**: The database schema defines 3 roles (`admin`, `coordinadora`, `consulta`), but the TypeScript application code references 6 roles (`admin`, `coordinadora`, `laboratorio`, `cedis`, `pendiente`, `consulta`). This documentation describes the database schema as the source of truth. The application may need schema migration to support all intended roles, or TypeScript types should be updated to match the database enum.
+</Warning>
+
 ## Role Definitions
 
 Roles are defined as a PostgreSQL enum type:

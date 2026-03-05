@@ -8,6 +8,10 @@ icon: 'flask'
 
 As a **Laboratory Technician (Laboratorio)**, you are responsible for technical validation, quality control, and monitoring material deliveries that require laboratory inspection. Your role ensures that incoming materials meet quality standards before being approved for production use.
 
+<Warning>
+**Role Configuration**: The `laboratorio` role is implemented in the application code but may need to be added to the database schema enum. If you encounter role assignment errors, verify that your database `user_role` enum includes `'laboratorio'`. See [Database Roles](/database/roles) for schema configuration.
+</Warning>
+
 <Note>
 Laboratory users have **view and edit permissions** but cannot create new requisitions or delete existing ones. You can update delivery status, add quality notes, and track material receipts.
 </Note>

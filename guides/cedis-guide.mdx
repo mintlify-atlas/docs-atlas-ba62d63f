@@ -8,6 +8,10 @@ icon: 'warehouse'
 
 As a **CEDIS (Centro de Distribución) team member**, you are responsible for receiving material deliveries, confirming inventory receipts, tracking destination routing, and reporting any discrepancies. You are the first point of contact when materials arrive at the facility.
 
+<Warning>
+**Role Configuration**: The `cedis` role is implemented in the application code but may need to be added to the database schema enum. If you encounter role assignment errors, verify that your database `user_role` enum includes `'cedis'`. See [Database Roles](/database/roles) for schema configuration.
+</Warning>
+
 <Note>
 CEDIS users have **view and edit permissions** but cannot create new requisitions or delete existing ones. You can update delivery status, confirm quantities, and document receipt information.
 </Note>

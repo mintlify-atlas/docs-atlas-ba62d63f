@@ -92,7 +92,11 @@ if (user && pathname === '/') {
 
 ## User Roles
 
-The system implements six user roles defined in the database schema:
+<Warning>
+**Implementation Note**: The TypeScript application code references six roles, but the database schema currently defines only three roles in the PostgreSQL enum (`admin`, `coordinadora`, `consulta`). To use all six roles as intended, the database schema needs migration to add `laboratorio`, `cedis`, and `pendiente` to the `user_role` enum. See [Database Roles](/database/roles) for the current schema definition.
+</Warning>
+
+The application code implements six user roles:
 
 ```typescript
 // From types/index.ts:100-109
