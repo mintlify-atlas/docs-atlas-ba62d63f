@@ -1,0 +1,633 @@
+---
+title: Server Actions
+description: Next.js Server Actions for data operations and authentication
+---
+
+## Overview
+
+The Cloro de Hidalgo Procurement System uses Next.js 16 Server Actions for all data operations. Server Actions provide:
+- Type-safe API layer
+- Automatic serialization
+- Built-in error handling
+- Direct database access
+- RLS policy enforcement
+
+<Note>
+All Server Actions are defined with the `'use server'` directive at the top of the file.
+</Note>
+
+## Server Actions Structure
+
+```
+lib/actions/
+├── auth.ts               # Authentication operations
+├── catalogos.ts          # Catalog CRUD operations
+├── requisiciones.ts      # Requisition operations
+└── users.ts              # User management
+```
+
+## Authentication Actions
+
+Located at `lib/actions/auth.ts`.
+
+### signIn
+
+Authenticate user with email and password:
+
+```typescript
+'use server'
+
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
+
+export async function signIn(formData: { email: string; password: string }) {
+    const supabase = await createClient()
+
+    const { error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+    })
+
+    if (error) {
+        return { error: error.message }
+    }
+
+    revalidatePath('/', 'layout')
+    redirect('/dashboard/calendar')
+}
+```
+
+**Usage in client component**:
+
+```tsx
+'use client'
+
+import { signIn } from '@/lib/actions/auth'
+import { toast } from 'sonner'
+
+const handleLogin = async (data: { email: string; password: string }) => {
+    const result = await signIn(data)
+    if (result?.error) {
+        toast.error(result.error)
+    }
+    // On success, redirect happens automatically
+}
+```
+
+### signUp
+
+Register new user:
+
+```typescript
+export async function signUp(formData: { 
+    email: string
+    password: string
+    nombre_completo: string 
+}) {
+    const supabase = await createClient()
+
+    const { error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+            data: {
+                nombre_completo: formData.nombre_completo,
+            }
+        }
+    })
+
+    if (error) {
+        return { error: error.message }
+    }
+
+    revalidatePath('/', 'layout')
+    redirect('/dashboard/pendiente')
+}
+```
+
+<Note>
+New users are automatically assigned the `consulta` role and redirected to a pending approval page.
+</Note>
+
+### signOut
+
+Sign out current user:
+
+```typescript
+export async function signOut() {
+    const supabase = await createClient()
+    await supabase.auth.signOut()
+    redirect('/login')
+}
+```
+
+### getCurrentProfile
+
+Get authenticated user's profile:
+
+```typescript
+export async function getCurrentProfile() {
+    const supabase = await createClient()
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return null
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+    return profile
+}
+```
+
+## Requisition Actions
+
+Located at `lib/actions/requisiciones.ts`.
+
+### createRequisicion
+
+Create a new purchase requisition:
+
+```typescript
+export async function createRequisicion(data: RequisicionFormData) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    // Permission check
+    if (!profile || !['admin', 'coordinadora'].includes(profile.rol)) {
+        return { error: 'No tienes permisos para crear requisiciones' }
+    }
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { error: 'Usuario no autenticado' }
+
+    // Insert requisition
+    const { data: result, error } = await supabase
+        .from('requisiciones')
+        .insert({
+            ...data,
+            created_by: user.id,
+        })
+        .select()
+        .single()
+
+    if (error) return { error: error.message }
+
+    // Revalidate cached pages
+    revalidatePath('/dashboard/calendar')
+    revalidatePath('/dashboard/requisiciones')
+    return { data: result }
+}
+```
+
+**Key features**:
+- Permission validation (admin/coordinadora only)
+- Automatic `created_by` tracking
+- Cache revalidation for affected routes
+- Type-safe input/output
+
+### updateRequisicion
+
+Update existing requisition with audit trail:
+
+```typescript
+export async function updateRequisicion(
+    id: string,
+    data: Partial<RequisicionFormData>,
+    camposModificados: Array<{ campo: string; anterior: string; nuevo: string }>
+) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (!profile || !['admin', 'coordinadora'].includes(profile.rol)) {
+        return { error: 'No tienes permisos para editar requisiciones' }
+    }
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { error: 'Usuario no autenticado' }
+
+    // Update requisition
+    const { data: result, error } = await supabase
+        .from('requisiciones')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) return { error: error.message }
+
+    // Write audit trail
+    if (camposModificados.length > 0) {
+        await supabase.from('requisiciones_historial').insert(
+            camposModificados.map((c) => ({
+                requisicion_id: id,
+                campo_modificado: c.campo,
+                valor_anterior: c.anterior,
+                valor_nuevo: c.nuevo,
+                usuario_id: user.id,
+            }))
+        )
+    }
+
+    revalidatePath('/dashboard/calendar')
+    revalidatePath('/dashboard/requisiciones')
+    return { data: result }
+}
+```
+
+**Usage with audit trail**:
+
+```tsx
+const camposModificados = [
+    {
+        campo: 'estatus_id',
+        anterior: '123-old-uuid',
+        nuevo: '456-new-uuid'
+    },
+    {
+        campo: 'fecha_confirmada',
+        anterior: '2024-01-01',
+        nuevo: '2024-01-05'
+    }
+]
+
+const result = await updateRequisicion(requisicionId, updatedData, camposModificados)
+```
+
+### deleteRequisicion
+
+Delete requisition (admin only):
+
+```typescript
+export async function deleteRequisicion(id: string) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (!profile) {
+        return { error: 'Usuario no autenticado' }
+    }
+
+    if (profile.rol !== 'admin' && profile.rol !== 'coordinadora') {
+        return { error: 'Solo el administrador o la coordinadora pueden eliminar requisiciones' }
+    }
+
+    // Delete with count verification
+    const { error, count } = await supabase
+        .from('requisiciones')
+        .delete({ count: 'exact' })
+        .eq('id', id)
+
+    if (error) {
+        return { error: error.message }
+    }
+
+    if (count === 0) {
+        return { error: 'No se pudo eliminar el registro. Es posible que ya no exista o no tengas permisos suficientes.' }
+    }
+
+    revalidatePath('/dashboard/calendar')
+    revalidatePath('/dashboard/requisiciones')
+    return { success: true }
+}
+```
+
+<Warning>
+Deletion cascades to `requisiciones_historial` due to `ON DELETE CASCADE` in the database schema.
+</Warning>
+
+### getRequisiciones
+
+Fetch requisitions with filters:
+
+```typescript
+export async function getRequisiciones(filters?: RequisicionFilters) {
+    const supabase = await createClient()
+
+    let query = supabase
+        .from('requisiciones')
+        .select(
+            `
+      *,
+      proveedor:proveedores(id, nombre),
+      producto:productos(id, nombre),
+      presentacion:presentaciones(id, nombre),
+      destino:destinos(id, nombre),
+      estatus:estatus(id, nombre, color_hex),
+      unidad_cantidad:unidades(id, nombre, abreviatura)
+    `
+        )
+        .order('fecha_recepcion', { ascending: true })
+
+    if (filters?.proveedor_id) {
+        query = query.eq('proveedor_id', filters.proveedor_id)
+    }
+    if (filters?.destino_id) {
+        query = query.eq('destino_id', filters.destino_id)
+    }
+    if (filters?.estatus_id) {
+        query = query.eq('estatus_id', filters.estatus_id)
+    }
+    if (filters?.fecha_desde) {
+        query = query.gte('fecha_recepcion', filters.fecha_desde)
+    }
+    if (filters?.fecha_hasta) {
+        query = query.lte('fecha_recepcion', filters.fecha_hasta)
+    }
+
+    const { data, error } = await query
+
+    if (error) return { error: error.message }
+    return { data: data ?? [] }
+}
+```
+
+**Usage with filters**:
+
+```tsx
+const filters: RequisicionFilters = {
+    proveedor_id: 'uuid-here',
+    estatus_id: 'uuid-here',
+    fecha_desde: '2024-01-01',
+    fecha_hasta: '2024-12-31'
+}
+
+const { data, error } = await getRequisiciones(filters)
+```
+
+### getCatalogos
+
+Fetch all catalog data:
+
+```typescript
+export async function getCatalogos() {
+    const supabase = await createClient()
+
+    const [proveedores, productos, presentaciones, destinos, estatus, unidades] =
+        await Promise.all([
+            supabase.from('proveedores').select('*').order('nombre'),
+            supabase.from('productos').select('*').order('nombre'),
+            supabase.from('presentaciones').select('*').order('nombre'),
+            supabase.from('destinos').select('*').order('nombre'),
+            supabase.from('estatus').select('*').order('nombre'),
+            supabase.from('unidades').select('*').order('nombre'),
+        ])
+
+    return {
+        proveedores: proveedores.data ?? [],
+        productos: productos.data ?? [],
+        presentaciones: presentaciones.data ?? [],
+        destinos: destinos.data ?? [],
+        estatus: estatus.data ?? [],
+        unidades: unidades.data ?? [],
+    }
+}
+```
+
+**Usage in component**:
+
+```tsx
+const catalogos = await getCatalogos()
+
+<Select>
+    {catalogos.proveedores.map(p => (
+        <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+    ))}
+</Select>
+```
+
+### getHistorial
+
+Fetch audit trail:
+
+```typescript
+export async function getHistorial(requisicionId?: string) {
+    const supabase = await createClient()
+
+    let query = supabase
+        .from('requisiciones_historial')
+        .select(
+            `
+      *,
+      profiles(id, nombre_completo, rol)
+    `
+        )
+        .order('created_at', { ascending: false })
+
+    if (requisicionId) {
+        query = query.eq('requisicion_id', requisicionId)
+    }
+
+    const { data, error } = await query
+    if (error) return { error: error.message }
+    return { data: data ?? [] }
+}
+```
+
+## Permission Patterns
+
+### Role-Based Access Control
+
+All mutation actions check permissions:
+
+```typescript
+const profile = await getCurrentProfile()
+
+// Admin only
+if (profile?.rol !== 'admin') {
+    return { error: 'No tienes permisos' }
+}
+
+// Admin or Coordinadora
+if (!profile || !['admin', 'coordinadora'].includes(profile.rol)) {
+    return { error: 'No tienes permisos' }
+}
+```
+
+### RLS Policy Enforcement
+
+Supabase RLS policies provide an additional security layer:
+
+```sql
+-- Even if the code doesn't check, RLS blocks unauthorized operations
+CREATE POLICY "requisiciones: admin and coordinadora can insert" 
+ON requisiciones
+FOR INSERT TO authenticated
+WITH CHECK (get_my_role() IN ('admin', 'coordinadora'));
+```
+
+## Error Handling
+
+### Standard Error Response
+
+```typescript
+if (error) {
+    return { error: error.message }
+}
+
+return { data: result }
+```
+
+### Client-Side Error Handling
+
+```tsx
+const result = await createRequisicion(data)
+
+if (result.error) {
+    toast.error(result.error)
+    return
+}
+
+if (result.data) {
+    toast.success('Requisición creada exitosamente')
+    onSuccess?.()
+}
+```
+
+## Cache Revalidation
+
+Use `revalidatePath` to refresh cached data:
+
+```typescript
+import { revalidatePath } from 'next/cache'
+
+// Revalidate specific route
+revalidatePath('/dashboard/calendar')
+
+// Revalidate entire layout
+revalidatePath('/', 'layout')
+
+// Revalidate multiple routes
+revalidatePath('/dashboard/calendar')
+revalidatePath('/dashboard/requisiciones')
+```
+
+## Redirects
+
+Use `redirect` for navigation:
+
+```typescript
+import { redirect } from 'next/navigation'
+
+// After successful login
+redirect('/dashboard/calendar')
+
+// After logout
+redirect('/login')
+```
+
+<Warning>
+`redirect()` throws an error internally. Don't wrap it in try/catch.
+</Warning>
+
+## Type Safety
+
+### Input Types
+
+```typescript
+import type { RequisicionFormData, RequisicionFilters } from '@/types'
+
+export async function createRequisicion(data: RequisicionFormData) {
+    // TypeScript ensures data has correct shape
+}
+```
+
+### Output Types
+
+```typescript
+interface ActionResult<T> {
+    data?: T
+    error?: string
+}
+
+export async function getRequisiciones(): Promise<ActionResult<Requisicion[]>> {
+    // ...
+}
+```
+
+## Best Practices
+
+<Steps>
+
+### Always Validate Permissions
+
+Check user role before mutations:
+
+```typescript
+const profile = await getCurrentProfile()
+if (!profile || !hasPermission(profile.rol)) {
+    return { error: 'No tienes permisos' }
+}
+```
+
+### Revalidate After Mutations
+
+Refresh affected routes:
+
+```typescript
+revalidatePath('/dashboard/calendar')
+revalidatePath('/dashboard/requisiciones')
+```
+
+### Use Transactions for Related Operations
+
+When updating multiple tables:
+
+```typescript
+// Update requisition
+await supabase.from('requisiciones').update(data).eq('id', id)
+
+// Write audit log
+await supabase.from('requisiciones_historial').insert(historialEntries)
+```
+
+### Handle Errors Gracefully
+
+Return user-friendly error messages:
+
+```typescript
+if (error) {
+    return { error: 'No se pudo guardar. Intenta nuevamente.' }
+}
+```
+
+</Steps>
+
+## Testing Server Actions
+
+Server Actions can be tested in Server Components:
+
+```tsx
+// app/test/page.tsx
+import { getCatalogos } from '@/lib/actions/requisiciones'
+
+export default async function TestPage() {
+    const catalogos = await getCatalogos()
+    
+    return (
+        <div>
+            <h1>Proveedores: {catalogos.proveedores.length}</h1>
+        </div>
+    )
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Supabase Setup" icon="database" href="/development/supabase-setup">
+    Understand RLS policies and database schema
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/development/deployment">
+    Deploy your application to production
+  </Card>
+</CardGroup>

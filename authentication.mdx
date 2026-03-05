@@ -1,0 +1,695 @@
+---
+title: Authentication
+description: Learn about Supabase authentication, role-based access control, and user management in the Cloro de Hidalgo Procurement System
+---
+
+# Authentication & Access Control
+
+The Cloro de Hidalgo Procurement System uses **Supabase Authentication** with a custom role-based access control (RBAC) system to secure data and enforce permissions.
+
+## Authentication Architecture
+
+### Supabase SSR Integration
+
+The application uses Supabase's SSR (Server-Side Rendering) package for seamless authentication across client and server components:
+
+```typescript
+// From lib/supabase/server.ts
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export async function createClient() {
+  const cookieStore = await cookies()
+  
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          // Set cookies for auth persistence
+        },
+      },
+    }
+  )
+}
+```
+
+### Middleware Protection
+
+Next.js middleware protects routes and handles authentication redirects:
+
+```typescript
+// From middleware.ts:1-19
+import { type NextRequest } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
+
+export async function middleware(request: NextRequest) {
+  return await updateSession(request)
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'
+  ],
+}
+```
+
+The `updateSession` function from `lib/supabase/middleware.ts` enforces these rules:
+
+```typescript
+// From lib/supabase/middleware.ts:32-63
+const {
+  data: { user },
+} = await supabase.auth.getUser()
+
+const { pathname } = request.nextUrl
+
+// Protect dashboard routes
+if (!user && pathname.startsWith('/dashboard')) {
+  const url = request.nextUrl.clone()
+  url.pathname = '/login'
+  return NextResponse.redirect(url)
+}
+
+// Redirect logged in users away from login
+if (user && pathname === '/login') {
+  const url = request.nextUrl.clone()
+  url.pathname = '/dashboard/calendar'
+  return NextResponse.redirect(url)
+}
+
+// Redirect root to dashboard
+if (user && pathname === '/') {
+  const url = request.nextUrl.clone()
+  url.pathname = '/dashboard/calendar'
+  return NextResponse.redirect(url)
+}
+```
+
+## User Roles
+
+The system implements six user roles defined in the database schema:
+
+```typescript
+// From types/index.ts:100-109
+export type UserRole = 'admin' | 'coordinadora' | 'laboratorio' | 'cedis' | 'pendiente' | 'consulta'
+
+export interface Profile {
+  id: string
+  nombre_completo: string | null
+  email: string | null
+  rol: UserRole
+  created_at: string
+  updated_at: string
+}
+```
+
+### Role Definitions
+
+<Steps>
+  <Step title="admin">
+    **Administrator** - Full system access
+    
+    - Create, edit, delete requisitions
+    - Manage all catalogs (suppliers, products, etc.)
+    - Approve/reject user registrations
+    - Assign and modify user roles
+    - Delete users
+    - Access admin panel
+    - Edit fecha_confirmada field
+  </Step>
+  
+  <Step title="coordinadora">
+    **Coordinator** - Procurement management
+    
+    - Create, edit, delete requisitions
+    - Manage catalogs
+    - Approve/reject user registrations
+    - Assign roles to new users
+    - Access admin panel
+    - Edit fecha_confirmada field
+    - Cannot delete existing users
+  </Step>
+  
+  <Step title="laboratorio">
+    **Laboratory** - Read-only access
+    
+    - View all requisitions
+    - View calendar
+    - Filter and search data
+    - No create/edit/delete permissions
+  </Step>
+  
+  <Step title="cedis">
+    **Distribution Center (CEDIS)** - Read-only access
+    
+    - View all requisitions
+    - View calendar
+    - Filter and search data  
+    - No create/edit/delete permissions
+  </Step>
+  
+  <Step title="pendiente">
+    **Pending** - Awaiting approval
+    
+    - Automatically assigned on registration
+    - No system access until approved
+    - Redirected to pending page after signup
+    - Must be approved by admin/coordinadora
+  </Step>
+  
+  <Step title="consulta">
+    **Consultation (Deprecated)** - Legacy read-only role
+    
+    - View-only access (same as laboratorio/cedis)
+    - No longer assigned to new users
+  </Step>
+</Steps>
+
+## Role-Based Permissions
+
+The `useAuthRole` hook provides granular permission checks throughout the application:
+
+```typescript
+// From lib/hooks/useAuthRole.ts:27-106
+export function useAuthRole(): UseAuthRoleReturn {
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  
+  // Fetch user and profile on mount
+  useEffect(() => {
+    async function fetchUserAndProfile() {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+        
+        setProfile(profileData)
+      }
+    }
+    
+    fetchUserAndProfile()
+  }, [])
+  
+  const role = profile?.rol ?? null
+  const isAdmin = role === 'admin'
+  const isCoordinadora = role === 'coordinadora'
+  const isLaboratorio = role === 'laboratorio'
+  const isCedis = role === 'cedis'
+  const isPendiente = role === 'pendiente'
+  const isConsulta = role === 'consulta'
+  
+  // Computed permissions
+  const canCreate = isAdmin || isCoordinadora
+  const canEdit = isAdmin || isCoordinadora
+  const canDelete = isAdmin || isCoordinadora
+  const canViewOnly = isLaboratorio || isCedis || isConsulta
+  const canManageUsers = isAdmin || isCoordinadora
+  const canAccessAdmin = isAdmin || isCoordinadora
+  
+  return {
+    user,
+    profile,
+    role,
+    isAdmin,
+    isCoordinadora,
+    isLaboratorio,
+    isCedis,
+    isPendiente,
+    isConsulta,
+    canCreate,
+    canEdit,
+    canDelete,
+    canViewOnly,
+    canManageUsers,
+    canAccessAdmin,
+    loading,
+  }
+}
+```
+
+### Permission Matrix
+
+| Permission | admin | coordinadora | laboratorio | cedis | pendiente |
+|------------|-------|--------------|-------------|-------|----------|
+| View requisitions | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Create requisitions | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Edit requisitions | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Delete requisitions | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Edit fecha_confirmada | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Manage catalogs | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Approve users | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Assign roles | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Delete users | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Access admin panel | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+## User Registration Flow
+
+### 1. User Signs Up
+
+New users register through the self-service signup form:
+
+```typescript
+// From lib/actions/auth.ts:23-42
+export async function signUp(formData: { 
+  email: string; 
+  password: string; 
+  nombre_completo: string 
+}) {
+  const supabase = await createClient()
+  
+  const { error } = await supabase.auth.signUp({
+    email: formData.email,
+    password: formData.password,
+    options: {
+      data: {
+        nombre_completo: formData.nombre_completo,
+      }
+    }
+  })
+  
+  if (error) {
+    return { error: error.message }
+  }
+  
+  revalidatePath('/', 'layout')
+  redirect('/dashboard/pendiente')
+}
+```
+
+<Note>
+  The user's `nombre_completo` is stored in Supabase's `auth.users.raw_user_meta_data` field, then copied to the `profiles` table by a database trigger.
+</Note>
+
+### 2. Profile Created with Pending Role
+
+A Supabase database trigger automatically creates a profile with `rol = 'pendiente'`:
+
+```sql
+-- Database trigger (conceptual representation)
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+
+-- Function creates profile with pendiente role
+CREATE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, nombre_completo, rol)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    NEW.raw_user_meta_data->>'nombre_completo',
+    'pendiente'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+### 3. Admin Reviews Pending Users
+
+Administrators see pending users in the admin panel:
+
+```typescript
+// From lib/actions/users.ts:23-32
+export async function getPendingUsers() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('rol', 'pendiente')
+    .order('created_at', { ascending: false })
+  
+  return { data, error: error?.message }
+}
+```
+
+### 4. Admin Approves and Assigns Role
+
+```typescript
+// From lib/actions/users.ts:49-58
+export async function approveUser(userId: string, newRole: UserRole) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('profiles')
+    .update({ rol: newRole, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+  
+  revalidatePath('/dashboard/admin')
+  return { error: error?.message }
+}
+```
+
+The admin panel UI from `app/dashboard/admin/page.tsx` allows selecting from assignable roles:
+
+```typescript
+// From app/dashboard/admin/page.tsx:49
+const ASSIGNABLE_ROLES: UserRole[] = ['admin', 'coordinadora', 'laboratorio', 'cedis']
+```
+
+### 5. Or Admin Rejects User
+
+```typescript
+// From lib/actions/users.ts:60-67
+export async function rejectUser(userId: string) {
+  // Need admin client to delete auth user
+  const adminClient = await getAdminClient()
+  const { error } = await adminClient.auth.admin.deleteUser(userId)
+  
+  revalidatePath('/dashboard/admin')
+  return { error: error?.message }
+}
+```
+
+<Warning>
+  Rejecting a user permanently deletes their account from Supabase Auth. They must re-register if they want to request access again.
+</Warning>
+
+## Managing User Roles
+
+### Viewing Active Users
+
+Admins can view all active users (non-pending):
+
+```typescript
+// From lib/actions/users.ts:34-43
+export async function getActiveUsers() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .not('rol', 'in', '("pendiente")')
+    .order('created_at', { ascending: false })
+  
+  return { data, error: error?.message }
+}
+```
+
+### Updating User Roles
+
+Admins and coordinadoras can change user roles:
+
+```typescript
+// From lib/actions/users.ts:77-86
+export async function updateUserRole(userId: string, newRole: UserRole) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('profiles')
+    .update({ rol: newRole, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+  
+  revalidatePath('/dashboard/admin')
+  return { error: error?.message }
+}
+```
+
+### Deleting Users (Admin Only)
+
+```typescript
+// From lib/actions/users.ts:69-75
+export async function deleteUser(userId: string) {
+  const adminClient = await getAdminClient()
+  const { error } = await adminClient.auth.admin.deleteUser(userId)
+  
+  revalidatePath('/dashboard/admin')
+  return { error: error?.message }
+}
+```
+
+<Note>
+  Deleting a user requires the **Supabase Service Role Key** and is only available to admin users. The coordinadora role cannot delete users.
+</Note>
+
+## Admin Client Setup
+
+Sensitive operations require the Supabase Admin Client:
+
+```typescript
+// From lib/actions/users.ts:12-17
+async function getAdminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+```
+
+<Warning>
+  **Environment Variables Required:**
+  
+  - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Public anon key for client operations
+  - `SUPABASE_SERVICE_ROLE_KEY` - Admin key for privileged operations (server-side only)
+  
+  Never expose the service role key to the client!
+</Warning>
+
+## Authentication Actions
+
+### Sign In
+
+```typescript
+// From lib/actions/auth.ts:7-21
+export async function signIn(formData: { email: string; password: string }) {
+  const supabase = await createClient()
+  
+  const { error } = await supabase.auth.signInWithPassword({
+    email: formData.email,
+    password: formData.password,
+  })
+  
+  if (error) {
+    return { error: error.message }
+  }
+  
+  revalidatePath('/', 'layout')
+  redirect('/dashboard/calendar')
+}
+```
+
+### Sign Out
+
+```typescript
+// From lib/actions/auth.ts:44-48
+export async function signOut() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  redirect('/login')
+}
+```
+
+### Get Current Profile
+
+```typescript
+// From lib/actions/auth.ts:50-66
+export async function getCurrentProfile() {
+  const supabase = await createClient()
+  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  
+  if (!user) return null
+  
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+  
+  return profile
+}
+```
+
+## Protecting UI Components
+
+Use the `useAuthRole` hook to conditionally render UI based on permissions:
+
+```typescript
+// Example: Conditional rendering based on role
+const { canEdit, canCreate, isAdmin } = useAuthRole()
+
+return (
+  <div>
+    {canCreate && (
+      <Button onClick={openCreateForm}>
+        Nueva Requisición
+      </Button>
+    )}
+    
+    {canEdit && (
+      <Button onClick={openEditForm}>
+        Editar
+      </Button>
+    )}
+    
+    {isAdmin && (
+      <Button onClick={deleteRequisicion}>
+        Eliminar
+      </Button>
+    )}
+  </div>
+)
+```
+
+### Fecha Confirmada Permission Example
+
+The requisition form restricts editing of the confirmed date field:
+
+```typescript
+// From components/forms/RequisicionForm.tsx:77-78
+const isEdit = !!initialData
+const canEditConfirmedDate = role === 'admin' || role === 'coordinadora'
+
+// Later in the form:
+<Input
+  type="date"
+  {...form.register('fecha_confirmada')}
+  className={`h-8 text-sm ${
+    canEditConfirmedDate 
+      ? 'border-[#3558a0]' 
+      : 'bg-[var(--bg)] cursor-not-allowed'
+  }`}
+  disabled={!canEditConfirmedDate}
+/>
+```
+
+## Database Security (RLS)
+
+<Note>
+  The application relies on **Supabase Row Level Security (RLS)** policies to enforce data access at the database level. Even if client-side checks are bypassed, the database will reject unauthorized operations.
+</Note>
+
+Typical RLS policies for this system:
+
+```sql
+-- Example: profiles table RLS
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- All authenticated users can read profiles
+CREATE POLICY "Users can view profiles"
+  ON profiles FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+-- Users can update their own profile
+CREATE POLICY "Users can update own profile"
+  ON profiles FOR UPDATE
+  USING (auth.uid() = id);
+
+-- Only admins can delete profiles
+CREATE POLICY "Admins can delete profiles"
+  ON profiles FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid()
+      AND rol = 'admin'
+    )
+  );
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Always check permissions server-side">
+    Don't rely solely on client-side permission checks. Use RLS policies and server action validation.
+  </Step>
+  
+  <Step title="Use the useAuthRole hook consistently">
+    Import and use the hook in every component that needs permission checks:
+    
+    ```typescript
+    import { useAuthRole } from '@/lib/hooks/useAuthRole'
+    
+    const { canEdit, loading } = useAuthRole()
+    
+    if (loading) return <Spinner />
+    if (!canEdit) return <AccessDenied />
+    ```
+  </Step>
+  
+  <Step title="Protect admin routes">
+    Always verify `canAccessAdmin` on admin pages:
+    
+    ```typescript
+    // From app/dashboard/admin/page.tsx:356-360
+    useEffect(() => {
+      if (!loading && !canAccessAdmin) {
+        router.replace('/dashboard/calendar')
+      }
+    }, [loading, canAccessAdmin, router])
+    ```
+  </Step>
+  
+  <Step title="Assign appropriate roles">
+    - Use **laboratorio** or **cedis** for view-only users
+    - Reserve **coordinadora** for procurement team members
+    - Limit **admin** to IT staff or senior management
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### User Can't Access After Approval
+
+**Symptoms:** User logs in but is redirected to pending page or has no access.
+
+**Solution:**
+- Verify the user's role in Supabase dashboard
+- Check that role was updated from 'pendiente' to a valid role
+- Have user log out and log back in to refresh session
+
+### Permission Denied Errors
+
+**Symptoms:** User sees "Access Denied" or actions fail silently.
+
+**Solution:**
+- Verify user's current role with `useAuthRole`
+- Check RLS policies in Supabase
+- Ensure service role key is set for admin operations
+
+### Can't Delete Users
+
+**Symptoms:** Delete user button doesn't work or throws error.
+
+**Solution:**
+- Verify `SUPABASE_SERVICE_ROLE_KEY` is set in environment variables
+- Check that current user is admin (not coordinadora)
+- Review server logs for specific error messages
+
+## Security Considerations
+
+<Warning>
+  **Security Checklist:**
+  
+  ✅ Service role key is only used server-side (Server Actions, API routes)  
+  ✅ RLS policies are enabled on all tables  
+  ✅ Client-side permission checks are supplemented with server-side validation  
+  ✅ Middleware protects all dashboard routes  
+  ✅ Sensitive operations (delete user, approve user) require elevated roles  
+  ✅ Password requirements enforce minimum 6 characters  
+  ✅ Session cookies are HTTP-only and secure  
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Learn the complete user workflow from signup to creating requisitions
+  </Card>
+  
+  <Card title="Admin Panel" icon="users">
+    Navigate to `/dashboard/admin` to manage user registrations and roles
+  </Card>
+</CardGroup>

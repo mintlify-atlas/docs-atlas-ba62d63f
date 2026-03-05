@@ -1,0 +1,186 @@
+---
+title: Installation
+description: Complete installation guide for the Cloro de Hidalgo Procurement System
+---
+
+## Prerequisites
+
+Before installing the Cloro de Hidalgo Procurement System, ensure you have the following:
+
+- **Node.js**: Version 18.x or higher
+- **npm**, **yarn**, or **pnpm**: Package manager (npm comes with Node.js)
+- **Git**: For cloning the repository
+- **Supabase Account**: Free account at [supabase.com](https://supabase.com)
+
+<Note>
+The system is built with Next.js 16.1.6 and React 19.2.3, which require Node.js 18.x minimum.
+</Note>
+
+## Installation Steps
+
+<Steps>
+
+### Clone the Repository
+
+Clone the project from GitHub:
+
+```bash
+git clone https://github.com/AlejandroMartinezG/App_Compras.git
+cd App_Compras
+```
+
+### Install Dependencies
+
+Install all required packages using your preferred package manager:
+
+<CodeGroup>
+
+```bash npm
+npm install
+```
+
+```bash yarn
+yarn install
+```
+
+```bash pnpm
+pnpm install
+```
+
+</CodeGroup>
+
+<Note>
+The installation includes these key dependencies:
+- **Next.js 16.1.6** - React framework
+- **React 19.2.3** - UI library
+- **Supabase SSR 0.8.0** - Database and authentication
+- **FullCalendar 6.1.20** - Calendar visualization
+- **React Hook Form 7.71.2** - Form management
+- **Zod 4.3.6** - Schema validation
+- **TanStack Table 8.21.3** - Data tables
+- **Tailwind CSS 4** - Styling framework
+- **Shadcn UI** - Component library
+</Note>
+
+### Configure Environment Variables
+
+Create a `.env.local` file in the project root:
+
+```bash
+touch .env.local
+```
+
+Add your Supabase credentials (see [Environment Setup](/development/environment) for details):
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### Set Up Supabase Database
+
+Run the database schema (detailed in [Supabase Setup](/development/supabase-setup)):
+
+1. Go to your Supabase project dashboard
+2. Navigate to SQL Editor
+3. Execute the `supabase/schema.sql` file
+
+### Run Development Server
+
+Start the development server:
+
+<CodeGroup>
+
+```bash npm
+npm run dev
+```
+
+```bash yarn
+yarn dev
+```
+
+```bash pnpm
+pnpm dev
+```
+
+</CodeGroup>
+
+The application will be available at `http://localhost:3000`
+
+</Steps>
+
+## Verify Installation
+
+After starting the development server:
+
+1. Open `http://localhost:3000` in your browser
+2. You should see the login screen
+3. Create a new account to test the system
+
+<Warning>
+New users are assigned the `consulta` role by default and need admin approval for full access.
+</Warning>
+
+## Available Scripts
+
+The `package.json` defines these scripts:
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| `dev` | `next dev` | Start development server on port 3000 |
+| `build` | `next build` | Build optimized production bundle |
+| `start` | `next start` | Start production server |
+| `lint` | `eslint` | Run ESLint for code quality |
+
+## TypeScript Configuration
+
+The project uses TypeScript 5 with these compiler options:
+
+- **Target**: ES2017
+- **Module**: ESNext with bundler resolution
+- **Strict Mode**: Enabled
+- **Path Aliases**: `@/*` maps to project root
+- **JSX**: react-jsx (React 19)
+
+## Troubleshooting
+
+### Port Already in Use
+
+If port 3000 is occupied, specify a different port:
+
+```bash
+PORT=3001 npm run dev
+```
+
+### Module Not Found
+
+Clear cache and reinstall dependencies:
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Supabase Connection Errors
+
+Verify your environment variables:
+- Check `.env.local` exists in project root
+- Confirm credentials match your Supabase dashboard
+- Ensure variables start with `NEXT_PUBLIC_`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Setup" icon="gear" href="/development/environment">
+    Configure environment variables and secrets
+  </Card>
+  <Card title="Supabase Setup" icon="database" href="/development/supabase-setup">
+    Set up database schema and authentication
+  </Card>
+  <Card title="Project Structure" icon="folder-tree" href="/development/project-structure">
+    Understand the codebase organization
+  </Card>
+  <Card title="Components" icon="puzzle-piece" href="/development/components">
+    Learn about UI components and forms
+  </Card>
+</CardGroup>

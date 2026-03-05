@@ -1,0 +1,412 @@
+---
+title: Project Structure
+description: Understanding the codebase organization and file layout
+---
+
+## Overview
+
+The Cloro de Hidalgo Procurement System follows Next.js 16 App Router conventions with a clean, modular architecture.
+
+## Root Directory Structure
+
+```
+App_Compras/
+├── app/                  # Next.js 16 App Router
+├── components/           # Reusable React components
+├── lib/                  # Business logic and utilities
+├── types/                # TypeScript type definitions
+├── supabase/             # Database schema and config
+├── public/               # Static assets (images, fonts)
+├── scripts/              # Utility scripts
+├── middleware.ts         # Next.js middleware (auth)
+├── components.json       # Shadcn UI configuration
+├── tsconfig.json         # TypeScript configuration
+├── next.config.ts        # Next.js configuration
+├── package.json          # Dependencies and scripts
+└── .gitignore            # Git ignore rules
+```
+
+## App Directory (`app/`)
+
+Next.js 16 App Router with file-based routing:
+
+```
+app/
+├── (auth)/
+│   └── login/
+│       └── page.tsx          # Login page
+├── dashboard/
+│   ├── admin/
+│   │   └── page.tsx          # Admin panel (user management)
+│   ├── calendar/
+│   │   └── page.tsx          # Calendar view (FullCalendar)
+│   ├── catalogos/
+│   │   └── page.tsx          # Catalog management
+│   ├── configuracion/
+│   │   └── page.tsx          # User settings
+│   ├── pendiente/
+│   │   └── page.tsx          # Pending approval page
+│   ├── requisiciones/
+│   │   ├── nueva/
+│   │   │   └── page.tsx      # Create new requisition
+│   │   └── page.tsx          # Requisitions list/table
+│   ├── layout.tsx            # Dashboard layout wrapper
+│   └── page.tsx              # Dashboard home (redirects)
+├── layout.tsx                # Root layout
+├── page.tsx                  # Home page (redirects to login/dashboard)
+└── globals.css               # Global styles and Tailwind imports
+```
+
+### Key Files
+
+#### `app/layout.tsx`
+Root layout with global providers:
+- Font configuration (Avenir Next LT Pro)
+- Theme provider (next-themes)
+- Toast notifications (Sonner)
+
+#### `app/dashboard/layout.tsx`
+Authenticated layout with:
+- Sidebar navigation
+- Header with user menu
+- Role-based access control
+
+#### `app/globals.css`
+Global styles including:
+- Tailwind CSS imports
+- Custom CSS variables (Cloro de Hidalgo brand colors)
+- Font-face declarations for Avenir Next
+- Theme definitions (light/dark mode)
+
+```css
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@font-face {
+  font-family: 'AvenirNext';
+  src: url('/fonts/AvenirNextLTPro-Regular.otf') format('opentype');
+  font-weight: 400;
+}
+
+:root {
+  --navy: #4266ac;      /* Corporate Blue */
+  --accent: #ecbe37;    /* Yellow */
+  --gray-brand: #5a5a59; /* Brand Gray */
+}
+```
+
+## Components Directory (`components/`)
+
+Reusable UI components organized by feature:
+
+```
+components/
+├── calendar/
+│   ├── CalendarView.tsx      # FullCalendar integration
+│   ├── EventModal.tsx        # Event details modal
+│   ├── SidebarFilters.tsx    # Calendar filters
+│   └── StatusLegend.tsx      # Status color legend
+├── forms/
+│   ├── FilterBar.tsx         # Requisition filters
+│   ├── QuickAddModal.tsx     # Quick catalog entry creation
+│   └── RequisicionForm.tsx   # Main requisition form
+├── layout/
+│   ├── Header.tsx            # Top navigation bar
+│   ├── Sidebar.tsx           # Left sidebar navigation
+│   └── UpcomingDeliveries.tsx # Dashboard widget
+└── ui/                       # Shadcn UI components (19 components)
+    ├── button.tsx
+    ├── dialog.tsx
+    ├── input.tsx
+    ├── select.tsx
+    ├── table.tsx
+    └── ... (14 more)
+```
+
+### Component Patterns
+
+#### Form Components
+Use React Hook Form + Zod validation:
+
+```typescript
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { requisicionSchema } from '@/lib/validations/schemas'
+
+const form = useForm({
+    resolver: zodResolver(requisicionSchema),
+    defaultValues: {...}
+})
+```
+
+#### Calendar Components
+Integrate FullCalendar v6:
+
+```typescript
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
+```
+
+## Library Directory (`lib/`)
+
+Business logic, data access, and utilities:
+
+```
+lib/
+├── actions/
+│   ├── auth.ts               # Authentication actions
+│   ├── catalogos.ts          # Catalog CRUD operations
+│   ├── requisiciones.ts      # Requisition operations
+│   └── users.ts              # User management
+├── hooks/
+│   ├── useAuthRole.ts        # Get current user role
+│   └── useCatalogos.ts       # Fetch catalog data
+├── supabase/
+│   ├── client.ts             # Browser Supabase client
+│   ├── server.ts             # Server Supabase client
+│   └── middleware.ts         # Session refresh middleware
+├── validations/
+│   └── schemas.ts            # Zod validation schemas
+└── utils.ts                  # Utility functions (cn, etc.)
+```
+
+### Key Files
+
+#### `lib/actions/requisiciones.ts`
+Server Actions for requisitions:
+
+```typescript
+'use server'
+
+export async function createRequisicion(data: RequisicionFormData)
+export async function updateRequisicion(id: string, data: Partial<RequisicionFormData>)
+export async function deleteRequisicion(id: string)
+export async function getRequisiciones(filters?: RequisicionFilters)
+export async function getCatalogos()
+export async function getHistorial(requisicionId?: string)
+```
+
+#### `lib/actions/auth.ts`
+Authentication operations:
+
+```typescript
+'use server'
+
+export async function signIn(formData: { email: string; password: string })
+export async function signUp(formData: { email: string; password: string; nombre_completo: string })
+export async function signOut()
+export async function getCurrentProfile()
+```
+
+#### `lib/supabase/server.ts`
+Server-side Supabase client:
+
+```typescript
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export async function createClient() {
+    const cookieStore = await cookies()
+    return createServerClient(...)
+}
+```
+
+#### `lib/validations/schemas.ts`
+Zod schemas for type-safe validation:
+
+```typescript
+export const requisicionSchema = z.object({
+    fecha_recepcion: z.string().min(1, 'La fecha es requerida'),
+    proveedor_id: z.string().uuid('Selecciona un proveedor'),
+    cantidad_solicitada: z.number().positive('Debe ser mayor a 0'),
+    // ... more fields
+})
+```
+
+## Types Directory (`types/`)
+
+TypeScript type definitions:
+
+```
+types/
+└── index.ts                  # All type definitions
+```
+
+### Type Categories
+
+```typescript
+// Catalog Types
+export interface Proveedor { id: string; nombre: string; ... }
+export interface Producto { id: string; nombre: string; ... }
+
+// Main Entities
+export interface Requisicion { ... }
+export interface RequisicionHistorial { ... }
+
+// Auth / Roles
+export type UserRole = 'admin' | 'coordinadora' | 'consulta'
+export interface Profile { ... }
+
+// Form Types
+export interface RequisicionFormData { ... }
+
+// Filter Types
+export interface RequisicionFilters { ... }
+
+// Calendar Types
+export interface CalendarEvent { ... }
+```
+
+## Supabase Directory (`supabase/`)
+
+Database schema and migrations:
+
+```
+supabase/
+└── schema.sql                # Complete database schema
+```
+
+Contains:
+- Table definitions (9 tables)
+- Indexes for performance
+- Row Level Security policies
+- Triggers and functions
+- Seed data
+
+## Public Directory (`public/`)
+
+Static assets served at root URL:
+
+```
+public/
+├── fonts/
+│   ├── AvenirNextLTPro-Regular.otf
+│   ├── AvenirNextLTPro-Bold.otf
+│   ├── AvenirNextLTPro-Demi.otf
+│   └── AvenirNextLTPro-It.otf
+├── loggin_panel.png          # Screenshot
+└── calendario_dashboard.png  # Screenshot
+```
+
+## Configuration Files
+
+### `middleware.ts`
+Next.js middleware for authentication:
+
+```typescript
+import { updateSession } from '@/lib/supabase/middleware'
+
+export async function middleware(request: NextRequest) {
+    return await updateSession(request)
+}
+
+export const config = {
+    matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg)$).*)'],
+}
+```
+
+- Protects `/dashboard/*` routes
+- Redirects unauthenticated users to `/login`
+- Refreshes Supabase session cookies
+
+### `components.json`
+Shadcn UI configuration:
+
+```json
+{
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils"
+  }
+}
+```
+
+### `tsconfig.json`
+TypeScript configuration:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "strict": true,
+    "paths": {
+      "@/*": ["./*"]
+    }
+  }
+}
+```
+
+## Import Patterns
+
+### Path Aliases
+
+Use `@/` prefix for all imports:
+
+```typescript
+import { createClient } from '@/lib/supabase/server'
+import { Button } from '@/components/ui/button'
+import type { Requisicion } from '@/types'
+import { requisicionSchema } from '@/lib/validations/schemas'
+```
+
+### Server vs Client Imports
+
+**Server Components/Actions**:
+```typescript
+import { createClient } from '@/lib/supabase/server'  // Server-side
+import { cookies } from 'next/headers'                 // Next.js server
+```
+
+**Client Components**:
+```typescript
+'use client'
+import { createClient } from '@/lib/supabase/client'  // Browser-side
+import { useState, useEffect } from 'react'
+```
+
+## File Naming Conventions
+
+- **Components**: PascalCase (e.g., `RequisicionForm.tsx`)
+- **Pages**: lowercase (e.g., `page.tsx`)
+- **Actions**: camelCase (e.g., `requisiciones.ts`)
+- **Types**: PascalCase interfaces (e.g., `Requisicion`)
+- **Utilities**: camelCase (e.g., `utils.ts`)
+
+## Data Flow Architecture
+
+```
+User Interaction
+    ↓
+Client Component (useState, forms)
+    ↓
+Server Action ('use server' functions)
+    ↓
+Supabase Client (server.ts)
+    ↓
+PostgreSQL Database (with RLS)
+    ↓
+Response to Client
+    ↓
+UI Update (revalidatePath, redirect)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Components" icon="puzzle-piece" href="/development/components">
+    Explore UI components and patterns
+  </Card>
+  <Card title="Server Actions" icon="server" href="/development/server-actions">
+    Learn about data operations
+  </Card>
+</CardGroup>

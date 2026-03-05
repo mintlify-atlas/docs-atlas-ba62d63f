@@ -1,0 +1,493 @@
+---
+title: "Audit History"
+description: "Complete change tracking and accountability for requisitions in the Cloro de Hidalgo procurement system"
+---
+
+## Overview
+
+The audit history system automatically tracks all changes made to requisitions, recording what changed, who made the change, and when it occurred. This provides complete accountability and traceability for compliance and operational review.
+
+<Info>
+Audit records are created automatically whenever a requisition is updated. Users cannot manually create or modify audit history entries.
+</Info>
+
+## Data Structure
+
+```typescript types/index.ts
+export interface RequisicionHistorial {
+    id: string                  // Unique history record ID
+    requisicion_id: string      // References parent requisition
+    campo_modificado: string    // Field name that changed
+    valor_anterior: string | null   // Previous value
+    valor_nuevo: string | null      // New value
+    usuario_id: string          // User who made the change
+    created_at: string          // Timestamp of change
+    profiles?: Profile          // Joined user profile data
+}
+```
+
+### Example Audit Record
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "requisicion_id": "123e4567-e89b-12d3-a456-426614174000",
+  "campo_modificado": "Estatus",
+  "valor_anterior": "Pendiente",
+  "valor_nuevo": "Confirmado",
+  "usuario_id": "user-abc-123",
+  "created_at": "2024-03-15T14:30:00.000Z",
+  "profiles": {
+    "id": "user-abc-123",
+    "nombre_completo": "María González",
+    "rol": "coordinadora"
+  }
+}
+```
+
+## Database Schema
+
+```sql supabase/schema.sql
+CREATE TABLE requisiciones_historial (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  requisicion_id    UUID NOT NULL REFERENCES requisiciones(id) ON DELETE CASCADE,
+  campo_modificado  TEXT NOT NULL,
+  valor_anterior    TEXT,
+  valor_nuevo       TEXT,
+  usuario_id        UUID NOT NULL REFERENCES auth.users(id),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_historial_requisicion ON requisiciones_historial(requisicion_id);
+```
+
+<Note>
+The `ON DELETE CASCADE` constraint ensures that when a requisition is deleted, all its audit history records are automatically deleted as well.
+</Note>
+
+## Automatic Audit Trail Creation
+
+Audit records are created automatically during requisition updates:
+
+```typescript lib/actions/requisiciones.ts
+export async function updateRequisicion(
+    id: string,
+    data: Partial<RequisicionFormData>,
+    camposModificados: Array<{ campo: string; anterior: string; nuevo: string }>
+) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (!profile || !['admin', 'coordinadora'].includes(profile.rol)) {
+        return { error: 'No tienes permisos para editar requisiciones' }
+    }
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { error: 'Usuario no autenticado' }
+
+    // Update the requisition
+    const { data: result, error } = await supabase
+        .from('requisiciones')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) return { error: error.message }
+
+    // Write audit trail for all modified fields
+    if (camposModificados.length > 0) {
+        await supabase.from('requisiciones_historial').insert(
+            camposModificados.map((c) => ({
+                requisicion_id: id,
+                campo_modificado: c.campo,
+                valor_anterior: c.anterior,
+                valor_nuevo: c.nuevo,
+                usuario_id: user.id,
+            }))
+        )
+    }
+
+    revalidatePath('/dashboard/calendar')
+    revalidatePath('/dashboard/requisiciones')
+    return { data: result }
+}
+```
+
+## Field Change Detection
+
+The requisition form automatically detects which fields changed:
+
+```typescript components/forms/RequisicionForm.tsx
+const fields: Record<string, string> = {
+    fecha_recepcion: 'Fecha de Recepción',
+    proveedor_id: 'Proveedor',
+    producto_id: 'Producto',
+    presentacion_id: 'Presentación',
+    destino_id: 'Destino',
+    estatus_id: 'Estatus',
+    cantidad_solicitada: 'Cantidad Solicitada',
+    unidad_cantidad_id: 'Unidad de Medida',
+    numero_oc: 'Número O.C.',
+    requisicion_numero: '№ Requi',
+    fecha_oc: 'Fecha de OC',
+    fecha_solicitada_entrega: 'Fecha Solicitada Entrega',
+    fecha_confirmada: 'Fecha Confirmada',
+    fecha_entregado: 'Fecha Entregado',
+    cantidad_entregada: 'Cantidad Entregada',
+    factura_remision: 'Factura/Remisión',
+    comentarios: 'Comentarios'
+}
+
+const modifications = Object.keys(values).reduce((acc, key) => {
+    const k = key as keyof RequisicionFormData
+    const newVal = String(values[k] ?? '')
+    const oldVal = String(initialData[k as keyof Requisicion] ?? '')
+
+    if (newVal !== oldVal) {
+        acc.push({
+            campo: fields[key] || key,
+            anterior: oldVal,
+            nuevo: newVal,
+        })
+    }
+    return acc
+}, [] as Array<{ campo: string; anterior: string; nuevo: string }>)
+
+result = await updateRequisicion(initialData.id, values, modifications)
+```
+
+<Tip>
+The system uses human-readable field labels ("Fecha de Recepción" instead of "fecha_recepcion") for better audit readability.
+</Tip>
+
+## Querying Audit History
+
+### For a Specific Requisition
+
+```typescript lib/actions/requisiciones.ts
+export async function getHistorial(requisicionId?: string) {
+    const supabase = await createClient()
+
+    let query = supabase
+        .from('requisiciones_historial')
+        .select(`
+            *,
+            profiles(id, nombre_completo, rol)
+        `)
+        .order('created_at', { ascending: false })
+
+    if (requisicionId) {
+        query = query.eq('requisicion_id', requisicionId)
+    }
+
+    const { data, error } = await query
+    if (error) return { error: error.message }
+    return { data: data ?? [] }
+}
+```
+
+### All History Records
+
+Omit the `requisicionId` parameter to fetch all audit records across all requisitions:
+
+```typescript
+const { data: allHistory } = await getHistorial()
+```
+
+<Note>
+History records are ordered by `created_at` descending, so the most recent changes appear first.
+</Note>
+
+## Viewing Audit History
+
+Audit history can be displayed in various contexts:
+
+### In Requisition Detail View
+
+```typescript
+const { data: historial } = await getHistorial(requisicion.id)
+
+<div className="audit-trail">
+  <h3>Historial de Cambios</h3>
+  {historial?.map(record => (
+    <div key={record.id} className="audit-record">
+      <div className="field-changed">{record.campo_modificado}</div>
+      <div className="values">
+        <span className="old-value">{record.valor_anterior || '(vacío)'}</span>
+        <span className="arrow">→</span>
+        <span className="new-value">{record.valor_nuevo || '(vacío)'}</span>
+      </div>
+      <div className="metadata">
+        Modificado por {record.profiles?.nombre_completo} el {formatDate(record.created_at)}
+      </div>
+    </div>
+  ))}
+</div>
+```
+
+### Timeline View
+
+Display changes chronologically:
+
+```typescript
+<Timeline>
+  {historial?.map(record => (
+    <TimelineItem key={record.id}>
+      <TimelineMarker />
+      <TimelineContent>
+        <h4>{record.campo_modificado}</h4>
+        <p>Cambió de "{record.valor_anterior}" a "{record.valor_nuevo}"</p>
+        <small>
+          {record.profiles?.nombre_completo} · {formatRelativeTime(record.created_at)}
+        </small>
+      </TimelineContent>
+    </TimelineItem>
+  ))}
+</Timeline>
+```
+
+## Tracked Fields
+
+The system tracks changes to all requisition fields:
+
+<AccordionGroup>
+  <Accordion title="Order Information">
+    - Número de Requisición
+    - Número O.C. (Purchase Order)
+    - Fecha de OC
+    - Fecha de Recepción
+    - Factura/Remisión
+  </Accordion>
+
+  <Accordion title="Catalog References">
+    - Proveedor (Supplier)
+    - Producto (Product)
+    - Presentación (Presentation)
+    - Destino (Destination)
+    - Estatus (Status)
+    - Unidad de Medida (Unit)
+  </Accordion>
+
+  <Accordion title="Dates">
+    - Fecha Solicitada Entrega
+    - Fecha Confirmada
+    - Fecha Entregado
+  </Accordion>
+
+  <Accordion title="Quantities">
+    - Cantidad Solicitada
+    - Cantidad Entregada
+  </Accordion>
+
+  <Accordion title="Additional Data">
+    - Comentarios (Comments)
+  </Accordion>
+</AccordionGroup>
+
+## User Information
+
+Audit records include user profile information via SQL join:
+
+```sql
+SELECT 
+  h.*,
+  p.id,
+  p.nombre_completo,
+  p.rol
+FROM requisiciones_historial h
+LEFT JOIN profiles p ON h.usuario_id = p.id
+WHERE h.requisicion_id = $1
+ORDER BY h.created_at DESC
+```
+
+This provides:
+- User's full name
+- User's role (admin, coordinadora, etc.)
+- Link back to user profile if needed
+
+## Compliance and Auditing
+
+### Tamper-Proof Design
+
+<Warning>
+Audit history records are immutable once created. The system provides no interface or API to modify or delete individual history records.
+</Warning>
+
+This ensures:
+- Complete audit trail integrity
+- Compliance with regulatory requirements
+- Protection against retroactive manipulation
+- Reliable forensic analysis
+
+### Data Retention
+
+Audit records are retained as long as their parent requisition exists:
+
+- **Active requisitions**: Full history available
+- **Deleted requisitions**: History deleted via CASCADE
+- **No automatic purging**: Records never expire
+
+<Note>
+If long-term audit retention is required even after requisition deletion, implement a separate archival process before deletion.
+</Note>
+
+## Row-Level Security
+
+Audit history respects the same RLS policies as requisitions:
+
+```sql supabase/schema.sql
+ALTER TABLE requisiciones_historial ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "historial: authenticated can view" ON requisiciones_historial
+  FOR SELECT USING (auth.role() = 'authenticated');
+```
+
+All authenticated users can view audit history, but only the system can create records (through server actions).
+
+## Performance Considerations
+
+### Indexed Queries
+
+The `requisicion_id` column is indexed for fast lookups:
+
+```sql
+CREATE INDEX idx_historial_requisicion ON requisiciones_historial(requisicion_id);
+```
+
+This optimizes queries like:
+```sql
+SELECT * FROM requisiciones_historial WHERE requisicion_id = 'uuid';
+```
+
+### Batch Inserts
+
+Multiple field changes in a single update are inserted in one batch operation:
+
+```typescript
+await supabase.from('requisiciones_historial').insert(
+    camposModificados.map((c) => ({
+        requisicion_id: id,
+        campo_modificado: c.campo,
+        valor_anterior: c.anterior,
+        valor_nuevo: c.nuevo,
+        usuario_id: user.id,
+    }))
+)
+```
+
+This reduces database round-trips when updating multiple fields.
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Compliance Audits" icon="shield-check">
+    Demonstrate who approved critical changes and when
+  </Card>
+  <Card title="Dispute Resolution" icon="scale">
+    Review what was promised vs. delivered
+  </Card>
+  <Card title="Process Analysis" icon="chart-line">
+    Identify bottlenecks by tracking status change timing
+  </Card>
+  <Card title="User Training" icon="graduation-cap">
+    Review common errors and improve training materials
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Review Changes Before Saving">
+    The requisition form shows a summary of changes before submission. Verify accuracy before confirming.
+  </Step>
+  
+  <Step title="Use Meaningful Comments">
+    When making significant changes, add explanatory comments to provide context for future reviewers.
+  </Step>
+  
+  <Step title="Regular History Reviews">
+    Periodically review audit history for unusual patterns or potential issues.
+  </Step>
+  
+  <Step title="Train on History Visibility">
+    Ensure team members know their changes are tracked and visible to maintain accountability.
+  </Step>
+</Steps>
+
+## Reporting and Analytics
+
+Audit history enables various analytics:
+
+### Most Frequently Changed Fields
+
+```sql
+SELECT campo_modificado, COUNT(*) as changes
+FROM requisiciones_historial
+GROUP BY campo_modificado
+ORDER BY changes DESC;
+```
+
+### User Activity Report
+
+```sql
+SELECT 
+  p.nombre_completo,
+  COUNT(*) as total_changes,
+  COUNT(DISTINCT h.requisicion_id) as requisiciones_affected
+FROM requisiciones_historial h
+JOIN profiles p ON h.usuario_id = p.id
+GROUP BY p.nombre_completo
+ORDER BY total_changes DESC;
+```
+
+### Status Change Timeline
+
+```sql
+SELECT 
+  campo_modificado,
+  valor_anterior,
+  valor_nuevo,
+  created_at
+FROM requisiciones_historial
+WHERE campo_modificado = 'Estatus'
+ORDER BY created_at DESC;
+```
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Requisition Management" icon="file-text" href="/features/requisitions">
+    Editing requisitions generates audit records
+  </Card>
+  <Card title="Status Tracking" icon="list-check" href="/features/status-tracking">
+    Status changes are prominently tracked
+  </Card>
+  <Card title="User Management" icon="users" href="/core-concepts/authentication">
+    User profiles linked to audit records
+  </Card>
+</CardGroup>
+
+## Future Enhancements
+
+Potential audit history improvements:
+
+<AccordionGroup>
+  <Accordion title="Export to CSV/PDF">
+    Allow exporting complete audit trails for external review or archival.
+  </Accordion>
+
+  <Accordion title="Advanced Filtering">
+    Filter history by date range, user, field type, or specific values.
+  </Accordion>
+
+  <Accordion title="Visual Diff Viewer">
+    Side-by-side comparison of old and new values with highlighting.
+  </Accordion>
+
+  <Accordion title="Email Notifications">
+    Alert stakeholders when critical fields (status, confirmed date) change.
+  </Accordion>
+</AccordionGroup>

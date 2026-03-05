@@ -1,0 +1,143 @@
+---
+title: Introduction
+description: Overview of the Cloro de Hidalgo Procurement System for managing purchase requisitions and delivery schedules
+---
+
+# Cloro de Hidalgo Procurement System
+
+The **Cloro de Hidalgo Procurement System** is a comprehensive Next.js 16 + Supabase SaaS application designed to streamline the purchase requisition management workflow for Cloro de Hidalgo S.A. de C.V.
+
+## What is it?
+
+This system provides a centralized platform for managing the complete lifecycle of material procurement, from initial requisition to final delivery. Built with modern web technologies, it offers real-time collaboration, role-based access control, and calendar-based delivery tracking.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Calendar-Based Tracking" icon="calendar">
+    Visual calendar interface for tracking delivery schedules, confirmed dates, and upcoming shipments with color-coded status indicators.
+  </Card>
+  
+  <Card title="Role-Based Access Control" icon="shield">
+    Four distinct user roles (Admin, Coordinadora, Laboratorio, CEDIS) with granular permissions for creating, editing, and viewing requisitions.
+  </Card>
+  
+  <Card title="Comprehensive Catalog Management" icon="database">
+    Manage suppliers (proveedores), products (productos), presentations, destinations, status types, and units of measurement.
+  </Card>
+  
+  <Card title="Audit Trail" icon="file-text">
+    Automatic change history tracking for all requisition modifications, maintaining a complete audit log of field changes.
+  </Card>
+</CardGroup>
+
+## Core Capabilities
+
+### Purchase Requisition Management
+- Create and edit requisitions with detailed product, supplier, and delivery information
+- Track multiple date fields: reception date, OC date, requested delivery, confirmed delivery, and actual delivery
+- Manage quantities, units, invoice/remission numbers, and comments
+- Real-time status updates with color-coded visual indicators
+
+### User Management
+- Self-service registration with admin approval workflow
+- Pending user queue for access requests
+- Dynamic role assignment and management
+- User profile configuration
+
+### Calendar & Reporting
+- Interactive FullCalendar integration showing confirmed delivery dates
+- Filter by supplier, destination, status, and date ranges
+- Sidebar with upcoming deliveries
+- Quick-view event details with inline editing
+
+### Data Architecture
+
+The system uses **Supabase** for:
+- PostgreSQL database for relational data storage
+- Row Level Security (RLS) for data access control
+- Real-time subscriptions for live updates
+- Built-in authentication with email/password
+
+## Technology Stack
+
+<Steps>
+  <Step title="Frontend">
+    - **Next.js 16** with App Router and Server Components
+    - **React 19** for interactive UI components
+    - **TypeScript** for type-safe development
+    - **Tailwind CSS 4** for styling
+    - **shadcn/ui** component library
+  </Step>
+  
+  <Step title="Backend & Database">
+    - **Supabase** for authentication, database, and real-time features
+    - **Supabase SSR** for server-side rendering support
+    - Server Actions for data mutations
+  </Step>
+  
+  <Step title="Additional Libraries">
+    - **FullCalendar** for calendar visualization
+    - **React Hook Form** + **Zod** for form validation
+    - **TanStack Table** for data tables
+    - **date-fns** for date manipulation
+  </Step>
+</Steps>
+
+## User Roles
+
+The system implements four primary roles with distinct permissions:
+
+| Role | Permissions | Use Case |
+|------|-------------|----------|
+| **Admin** | Full access: create, edit, delete requisitions; manage users; assign roles | System administrators |
+| **Coordinadora** | Create, edit, delete requisitions; manage catalogs; view all data | Procurement coordinators |
+| **Laboratorio** | View-only access to requisitions and calendar | Laboratory team members |
+| **CEDIS** | View-only access to requisitions and calendar | Distribution center staff |
+
+<Note>
+  New users register with a **pendiente** (pending) role and must be approved by an admin or coordinadora before gaining system access.
+</Note>
+
+## Getting Started
+
+To begin using the Cloro de Hidalgo Procurement System:
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Step-by-step guide from signup to creating your first requisition
+  </Card>
+  
+  <Card title="Authentication Setup" icon="key" href="/authentication">
+    Learn about Supabase authentication, roles, and access control
+  </Card>
+</CardGroup>
+
+## System Benefits
+
+✅ **Centralized Data** - Single source of truth for all procurement requests  
+✅ **Real-Time Collaboration** - Multiple users can work simultaneously with live updates  
+✅ **Audit Compliance** - Complete change history for regulatory compliance  
+✅ **Calendar Visibility** - Visual overview of delivery schedules prevents conflicts  
+✅ **Mobile Responsive** - Access from any device with responsive design  
+✅ **Role-Based Security** - Granular permissions protect sensitive data  
+
+## Next Steps
+
+<Steps>
+  <Step title="Read the Quickstart">
+    Follow our [Quickstart Guide](/quickstart) to create your first requisition
+  </Step>
+  
+  <Step title="Understand Authentication">
+    Learn about [Authentication & Roles](/authentication) to configure user access
+  </Step>
+  
+  <Step title="Explore Features">
+    Navigate the dashboard to explore calendar views, requisition tables, and catalog management
+  </Step>
+</Steps>
+
+<Warning>
+  This system is designed for **internal use by Cloro de Hidalgo employees only**. Access is restricted to authorized personnel with valid email credentials.
+</Warning>

@@ -1,0 +1,648 @@
+---
+title: 'Row Level Security'
+description: 'RLS policies and access control implementation'
+---
+
+## Overview
+
+The Cloro de Hidalgo Procurement System uses **PostgreSQL Row Level Security (RLS)** to enforce fine-grained access control at the database level. All tables have RLS enabled, and policies are based on user roles retrieved via the `get_my_role()` helper function.
+
+## Why RLS?
+
+<CardGroup cols={3}>
+  <Card title="Security by Default" icon="shield-check">
+    Database enforces access control, not just application code
+  </Card>
+  <Card title="Zero Trust" icon="lock">
+    Even compromised API keys cannot bypass policies
+  </Card>
+  <Card title="Audit Compliance" icon="file-contract">
+    Built-in protection for sensitive procurement data
+  </Card>
+</CardGroup>
+
+---
+
+## Role Helper Function
+
+### get_my_role()
+
+All RLS policies rely on this function to retrieve the current user's role:
+
+```sql
+CREATE OR REPLACE FUNCTION get_my_role()
+RETURNS user_role AS $$
+  SELECT rol FROM public.profiles WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+```
+
+**Key Properties:**
+- Returns the `user_role` enum: `admin`, `coordinadora`, or `consulta`
+- Uses `auth.uid()` to get current authenticated user ID
+- `SECURITY DEFINER`: Runs with creator privileges (can read profiles table)
+- `STABLE`: Result doesn't change within a transaction (cacheable)
+
+**Usage in Policies:**
+```sql
+USING (get_my_role() = 'admin')
+WITH CHECK (get_my_role() IN ('admin', 'coordinadora'))
+```
+
+---
+
+## Profiles Table Policies
+
+### Table Configuration
+
+```sql
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+```
+
+### Policies
+
+<Accordion title="Policy: Anyone Can View Own Profile">
+
+```sql
+CREATE POLICY "profiles: anyone can view own" ON profiles
+  FOR SELECT USING (id = auth.uid());
+```
+
+**Operation:** SELECT  
+**Allowed:** Authenticated users viewing their own profile
+
+**Effect:**
+- Users can query their own profile data
+- Returns empty set when querying other users' profiles
+
+**Example:**
+```sql
+-- User can see their own profile
+SELECT * FROM profiles WHERE id = auth.uid();
+-- Returns: 1 row
+
+-- User cannot see other profiles
+SELECT * FROM profiles WHERE id != auth.uid();
+-- Returns: 0 rows (unless they're admin)
+```
+
+</Accordion>
+
+<Accordion title="Policy: Admin Can View All Profiles">
+
+```sql
+CREATE POLICY "profiles: admin can view all" ON profiles
+  FOR SELECT USING (get_my_role() = 'admin');
+```
+
+**Operation:** SELECT  
+**Allowed:** Users with `admin` role
+
+**Effect:**
+- Admins can query all profiles
+- Used for user management interfaces
+
+**Example:**
+```sql
+-- Admin can list all users
+SELECT nombre_completo, rol, created_at 
+FROM profiles 
+ORDER BY created_at DESC;
+-- Returns: All profiles
+```
+
+</Accordion>
+
+<Accordion title="Policy: User Can Update Own Profile">
+
+```sql
+CREATE POLICY "profiles: user can update own" ON profiles
+  FOR UPDATE USING (id = auth.uid());
+```
+
+**Operation:** UPDATE  
+**Allowed:** Users updating their own profile
+
+**Effect:**
+- Users can modify their own `nombre_completo`
+- Cannot change their own `rol` (no WITH CHECK clause allows it)
+
+**Example:**
+```sql
+-- User can update their name
+UPDATE profiles 
+SET nombre_completo = 'Juan Pérez García' 
+WHERE id = auth.uid();
+-- Success
+
+-- User cannot update their role
+UPDATE profiles 
+SET rol = 'admin' 
+WHERE id = auth.uid();
+-- Fails: no policy allows changing rol
+```
+
+</Accordion>
+
+<Accordion title="Policy: Admin Can Manage All Profiles">
+
+```sql
+CREATE POLICY "profiles: admin can manage all" ON profiles
+  FOR ALL USING (get_my_role() = 'admin');
+```
+
+**Operation:** ALL (SELECT, INSERT, UPDATE, DELETE)  
+**Allowed:** Users with `admin` role
+
+**Effect:**
+- Admins have full control over all profiles
+- Can change user roles
+- Can create and delete user profiles
+
+**Example:**
+```sql
+-- Admin can change user roles
+UPDATE profiles 
+SET rol = 'coordinadora' 
+WHERE id = 'user-uuid';
+-- Success (if admin)
+```
+
+</Accordion>
+
+---
+
+## Catalog Tables Policies
+
+All 6 catalog tables (`proveedores`, `productos`, `presentaciones`, `destinos`, `estatus`, `unidades`) share identical policies:
+
+```sql
+ALTER TABLE proveedores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE productos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE presentaciones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE destinos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE estatus ENABLE ROW LEVEL SECURITY;
+ALTER TABLE unidades ENABLE ROW LEVEL SECURITY;
+```
+
+### Policy Pattern
+
+Policies are created dynamically for all catalog tables:
+
+<Accordion title="Policy: All Authenticated Can Select">
+
+```sql
+CREATE POLICY "proveedores: all authenticated can select" ON proveedores
+  FOR SELECT TO authenticated USING (TRUE);
+```
+
+**Applied to:** All catalog tables  
+**Operation:** SELECT  
+**Allowed:** Any authenticated user
+
+**Effect:**
+- All logged-in users can read catalog data
+- Required for dropdowns and reference data in UI
+- No role restrictions
+
+**Example:**
+```sql
+-- Any user can query catalogs
+SELECT * FROM proveedores WHERE activo = TRUE;
+SELECT * FROM productos ORDER BY nombre;
+SELECT * FROM estatus;
+-- All succeed for authenticated users
+```
+
+</Accordion>
+
+<Accordion title="Policy: Admin Full Access">
+
+```sql
+CREATE POLICY "proveedores: admin full access" ON proveedores
+  FOR ALL TO authenticated 
+  USING (get_my_role() = 'admin')
+  WITH CHECK (get_my_role() = 'admin');
+```
+
+**Applied to:** All catalog tables  
+**Operation:** ALL (INSERT, UPDATE, DELETE)  
+**Allowed:** Users with `admin` role
+
+**Effect:**
+- Only admins can modify catalog data
+- Prevents unauthorized changes to reference data
+- Ensures data consistency
+
+**Example:**
+```sql
+-- Admin can add new supplier
+INSERT INTO proveedores (nombre) VALUES ('Nuevo Proveedor');
+-- Success (if admin), fails (if coordinadora/consulta)
+
+-- Admin can update products
+UPDATE productos SET activo = FALSE WHERE id = 'prod-uuid';
+-- Success (if admin), fails (if coordinadora/consulta)
+```
+
+</Accordion>
+
+### Implementation
+
+Policies are created via loop for consistency:
+
+```sql
+DO $$
+DECLARE
+  tbl TEXT;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY[
+    'proveedores', 'productos', 'presentaciones', 
+    'destinos', 'estatus', 'unidades'
+  ] LOOP
+    -- SELECT policy
+    EXECUTE format('
+      CREATE POLICY "%s: all authenticated can select" ON %s
+        FOR SELECT TO authenticated USING (TRUE);', tbl, tbl);
+    
+    -- Admin policy
+    EXECUTE format('
+      CREATE POLICY "%s: admin full access" ON %s
+        FOR ALL TO authenticated 
+        USING (get_my_role() = ''admin'')
+        WITH CHECK (get_my_role() = ''admin'');', tbl, tbl);
+  END LOOP;
+END;
+$$;
+```
+
+---
+
+## Requisiciones Table Policies
+
+### Table Configuration
+
+```sql
+ALTER TABLE requisiciones ENABLE ROW LEVEL SECURITY;
+```
+
+### Policies
+
+<Accordion title="Policy: All Authenticated Can Select">
+
+```sql
+CREATE POLICY "requisiciones: all authenticated can select" ON requisiciones
+  FOR SELECT TO authenticated USING (TRUE);
+```
+
+**Operation:** SELECT  
+**Allowed:** All authenticated users
+
+**Effect:**
+- All users can view all requisitions
+- Supports read-only `consulta` role
+- Enables company-wide visibility
+
+**Example:**
+```sql
+-- Any user can query requisitions
+SELECT * FROM requisiciones 
+WHERE fecha_recepcion >= '2026-01-01';
+-- Returns all requisitions (all users can see all data)
+```
+
+</Accordion>
+
+<Accordion title="Policy: Admin and Coordinadora Can Insert">
+
+```sql
+CREATE POLICY "requisiciones: admin and coordinadora can insert" ON requisiciones
+  FOR INSERT TO authenticated
+  WITH CHECK (get_my_role() IN ('admin', 'coordinadora'));
+```
+
+**Operation:** INSERT  
+**Allowed:** `admin` and `coordinadora` roles
+
+**Effect:**
+- Only admins and coordinators can create requisitions
+- `consulta` role cannot create (read-only)
+
+**Example:**
+```sql
+-- Admin/coordinadora can create requisition
+INSERT INTO requisiciones (
+  fecha_recepcion, proveedor_id, producto_id, 
+  presentacion_id, destino_id, estatus_id,
+  cantidad_solicitada, unidad_cantidad_id, created_by
+) VALUES (
+  '2026-03-15', 'prov-uuid', 'prod-uuid',
+  'pres-uuid', 'dest-uuid', 'est-uuid',
+  100.50, 'unit-uuid', auth.uid()
+);
+-- Success (if admin/coordinadora), fails (if consulta)
+```
+
+</Accordion>
+
+<Accordion title="Policy: Admin and Coordinadora Can Update">
+
+```sql
+CREATE POLICY "requisiciones: admin and coordinadora can update" ON requisiciones
+  FOR UPDATE TO authenticated
+  USING (get_my_role() IN ('admin', 'coordinadora'))
+  WITH CHECK (get_my_role() IN ('admin', 'coordinadora'));
+```
+
+**Operation:** UPDATE  
+**Allowed:** `admin` and `coordinadora` roles
+
+**Effect:**
+- Only admins and coordinators can modify requisitions
+- Used for changing status, quantities, or other fields
+
+**Example:**
+```sql
+-- Admin/coordinadora can update status
+UPDATE requisiciones 
+SET estatus_id = (SELECT id FROM estatus WHERE nombre = 'Confirmado')
+WHERE id = 'req-uuid';
+-- Success (if admin/coordinadora), fails (if consulta)
+```
+
+</Accordion>
+
+<Accordion title="Policy: Admin Can Delete">
+
+```sql
+CREATE POLICY "requisiciones: admin can delete" ON requisiciones
+  FOR DELETE TO authenticated
+  USING (get_my_role() = 'admin');
+```
+
+**Operation:** DELETE  
+**Allowed:** `admin` role only
+
+**Effect:**
+- Only admins can delete requisitions
+- Coordinators cannot delete (prevents accidental data loss)
+- Provides highest level of protection
+
+**Example:**
+```sql
+-- Admin can delete requisition
+DELETE FROM requisiciones WHERE id = 'req-uuid';
+-- Success (if admin), fails (if coordinadora/consulta)
+```
+
+</Accordion>
+
+---
+
+## Requisiciones Historial Policies
+
+### Table Configuration
+
+```sql
+ALTER TABLE requisiciones_historial ENABLE ROW LEVEL SECURITY;
+```
+
+### Policies
+
+<Accordion title="Policy: Admin and Coordinadora Can Select">
+
+```sql
+CREATE POLICY "historial: admin and coordinadora can select" ON requisiciones_historial
+  FOR SELECT TO authenticated
+  USING (get_my_role() IN ('admin', 'coordinadora'));
+```
+
+**Operation:** SELECT  
+**Allowed:** `admin` and `coordinadora` roles
+
+**Effect:**
+- Only admins and coordinators can view audit history
+- Prevents `consulta` users from seeing change logs
+- Protects sensitive audit information
+
+**Example:**
+```sql
+-- Admin/coordinadora can view history
+SELECT * FROM requisiciones_historial 
+WHERE requisicion_id = 'req-uuid'
+ORDER BY created_at DESC;
+-- Returns history (if admin/coordinadora), empty (if consulta)
+```
+
+</Accordion>
+
+<Accordion title="Policy: System Can Insert">
+
+```sql
+CREATE POLICY "historial: system can insert" ON requisiciones_historial
+  FOR INSERT TO authenticated
+  WITH CHECK (get_my_role() IN ('admin', 'coordinadora'));
+```
+
+**Operation:** INSERT  
+**Allowed:** `admin` and `coordinadora` roles
+
+**Effect:**
+- Audit logs can only be created by users who can modify requisitions
+- Prevents unauthorized audit trail manipulation
+- Typically triggered automatically by application code
+
+**Example:**
+```sql
+-- Admin/coordinadora can log changes
+INSERT INTO requisiciones_historial (
+  requisicion_id, campo_modificado, 
+  valor_anterior, valor_nuevo, usuario_id
+) VALUES (
+  'req-uuid', 'estatus_id',
+  'old-status-uuid', 'new-status-uuid', auth.uid()
+);
+-- Success (if admin/coordinadora), fails (if consulta)
+```
+
+</Accordion>
+
+---
+
+## Permission Matrix
+
+| Table | Role | SELECT | INSERT | UPDATE | DELETE |
+|-------|------|--------|--------|--------|--------|
+| **profiles** | Own | ✓ | - | ✓ | - |
+| **profiles** | Admin | ✓ | ✓ | ✓ | ✓ |
+| **Catalog Tables** | All Auth | ✓ | - | - | - |
+| **Catalog Tables** | Admin | ✓ | ✓ | ✓ | ✓ |
+| **requisiciones** | All Auth | ✓ | - | - | - |
+| **requisiciones** | Coordinadora | ✓ | ✓ | ✓ | - |
+| **requisiciones** | Admin | ✓ | ✓ | ✓ | ✓ |
+| **requisiciones_historial** | Coordinadora | ✓ | ✓ | - | - |
+| **requisiciones_historial** | Admin | ✓ | ✓ | - | - |
+
+---
+
+## Testing RLS Policies
+
+### Verify Current User Role
+
+```sql
+SELECT get_my_role();
+-- Returns: 'admin' | 'coordinadora' | 'consulta'
+```
+
+### Test Policy Enforcement
+
+```sql
+-- Test as consulta user: should succeed
+SELECT COUNT(*) FROM requisiciones;
+
+-- Test as consulta user: should fail
+INSERT INTO requisiciones (...) VALUES (...);
+-- Error: new row violates row-level security policy
+
+-- Test as coordinadora: should succeed
+INSERT INTO requisiciones (...) VALUES (...);
+UPDATE requisiciones SET estatus_id = '...' WHERE id = '...';
+
+-- Test as coordinadora: should fail
+DELETE FROM requisiciones WHERE id = '...';
+-- Error: new row violates row-level security policy
+
+-- Test as admin: all should succeed
+INSERT INTO proveedores (nombre) VALUES ('Test');
+UPDATE profiles SET rol = 'admin' WHERE id = '...';
+DELETE FROM requisiciones WHERE id = '...';
+```
+
+### Check Applied Policies
+
+```sql
+-- List all policies on a table
+SELECT 
+  schemaname, tablename, policyname, 
+  permissive, roles, cmd, qual
+FROM pg_policies 
+WHERE tablename = 'requisiciones';
+```
+
+---
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always Enable RLS on New Tables">
+    Never forget to enable RLS:
+    
+    ```sql
+    CREATE TABLE new_table (...);
+    ALTER TABLE new_table ENABLE ROW LEVEL SECURITY;
+    
+    -- Without RLS enabled, tables are accessible to everyone!
+    ```
+  </Accordion>
+  
+  <Accordion title="Use SECURITY DEFINER Carefully">
+    The `get_my_role()` function uses `SECURITY DEFINER` to read profiles:
+    
+    - Only use for trusted functions
+    - Avoid SQL injection risks
+    - Keep function logic simple
+    - Use `STABLE` or `IMMUTABLE` when possible
+  </Accordion>
+  
+  <Accordion title="Test Policies with Different Roles">
+    Always test policies by:
+    
+    1. Creating test users with each role
+    2. Attempting allowed and forbidden operations
+    3. Verifying policy enforcement at database level
+    4. Testing in Supabase dashboard and via API
+  </Accordion>
+  
+  <Accordion title="Document Policy Changes">
+    When modifying policies:
+    
+    - Update schema.sql
+    - Add migration script
+    - Document in changelog
+    - Test thoroughly before deploying
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Troubleshooting
+
+<Accordion title="Error: new row violates row-level security policy">
+
+**Cause:** User's role doesn't have permission for the operation.
+
+**Solutions:**
+1. Check user role: `SELECT get_my_role();`
+2. Verify user has profile: `SELECT * FROM profiles WHERE id = auth.uid();`
+3. Check if policy exists: `SELECT * FROM pg_policies WHERE tablename = 'table_name';`
+4. Ensure correct role for operation (see permission matrix above)
+
+</Accordion>
+
+<Accordion title="Policy Not Working as Expected">
+
+**Debugging steps:**
+
+```sql
+-- 1. Check if RLS is enabled
+SELECT tablename, rowsecurity 
+FROM pg_tables 
+WHERE schemaname = 'public' AND tablename = 'requisiciones';
+-- rowsecurity should be TRUE
+
+-- 2. List all policies
+SELECT * FROM pg_policies WHERE tablename = 'requisiciones';
+
+-- 3. Verify get_my_role() works
+SELECT get_my_role();
+
+-- 4. Check user profile exists
+SELECT * FROM profiles WHERE id = auth.uid();
+```
+
+</Accordion>
+
+<Accordion title="Cannot Read Own Profile">
+
+**Cause:** Profile record doesn't exist.
+
+**Solution:**
+Manually trigger profile creation:
+
+```sql
+-- Check if profile exists
+SELECT * FROM profiles WHERE id = auth.uid();
+
+-- Create if missing
+INSERT INTO profiles (id, nombre_completo, rol)
+VALUES (auth.uid(), 'User Name', 'consulta');
+```
+
+This should happen automatically via the `on_auth_user_created` trigger.
+
+</Accordion>
+
+---
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="User Roles" icon="users" href="/database/roles">
+    Deep dive into role definitions and permissions
+  </Card>
+  <Card title="Table Reference" icon="table" href="/database/tables">
+    View detailed table schemas
+  </Card>
+  <Card title="Relationships" icon="diagram-project" href="/database/relationships">
+    Understand foreign key relationships
+  </Card>
+</CardGroup>

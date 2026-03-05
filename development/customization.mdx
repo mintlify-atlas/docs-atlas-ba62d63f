@@ -1,0 +1,723 @@
+---
+title: Customization
+description: Customize themes, add catalogs, extend roles, and modify workflows
+---
+
+## Overview
+
+The Cloro de Hidalgo Procurement System is built with customization in mind. This guide covers common customization scenarios.
+
+## Theming with Tailwind CSS
+
+### Brand Colors
+
+Corporate colors are defined in `app/globals.css`:
+
+```css
+:root {
+  /* Cloro de Hidalgo corporate color palette */
+  --navy: #4266ac;        /* Corporate Blue */
+  --navy-light: #62a4dc;  /* Light Blue */
+  --accent: #ecbe37;      /* Yellow */
+  --gray-brand: #5a5a59;  /* Brand Gray */
+  --brand-blue: #4266ac;
+  --foreground: #4266ac;
+  --muted: #5a5a59;
+  --border: #e2e8f0;
+  --bg: #f8fafc;
+  --white: #FFFFFF;
+  --card: #FFFFFF;
+}
+```
+
+### Customize Colors
+
+<Steps>
+
+### Update CSS Variables
+
+Edit `app/globals.css`:
+
+```css
+:root {
+  --navy: #YOUR_PRIMARY_COLOR;
+  --accent: #YOUR_ACCENT_COLOR;
+  --gray-brand: #YOUR_GRAY_COLOR;
+}
+```
+
+### Update Component Styles
+
+Use Tailwind classes with your custom colors:
+
+```tsx
+<div className="bg-[var(--navy)] text-white">
+  Custom colored component
+</div>
+```
+
+### Test Dark Mode
+
+The system supports dark mode via `next-themes`:
+
+```css
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root:where(.dark) {
+  --navy: #5277bd;        /* Lighter for dark mode */
+  --accent: #f5d563;      /* Adjusted yellow */
+  --bg: #1a1a1a;
+  --card: #2a2a2a;
+}
+```
+
+</Steps>
+
+### Typography
+
+Custom fonts are loaded in `app/globals.css`:
+
+```css
+@font-face {
+  font-family: 'AvenirNext';
+  src: url('/fonts/AvenirNextLTPro-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+```
+
+**To use a different font**:
+
+1. Add font files to `public/fonts/`
+2. Update `@font-face` declarations in `app/globals.css`
+3. Update Tailwind configuration if needed
+
+### Component Styling
+
+Shadcn components can be customized in `components/ui/`:
+
+```tsx
+// components/ui/button.tsx
+const buttonVariants = cva(
+  "inline-flex items-center justify-center rounded-md text-sm font-medium",
+  {
+    variants: {
+      variant: {
+        default: "bg-[var(--navy)] text-white hover:opacity-90",
+        outline: "border border-[var(--navy)] text-[var(--navy)]",
+        // Add custom variants
+        custom: "bg-[var(--accent)] text-black hover:bg-[var(--accent)]/90",
+      },
+    },
+  }
+)
+```
+
+## Adding New Catalogs
+
+### 1. Create Database Table
+
+Add to `supabase/schema.sql`:
+
+```sql
+CREATE TABLE mi_nuevo_catalogo (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nombre      TEXT NOT NULL,
+  descripcion TEXT,
+  activo      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE mi_nuevo_catalogo ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "mi_nuevo_catalogo: all authenticated can select" 
+ON mi_nuevo_catalogo
+FOR SELECT TO authenticated USING (TRUE);
+
+CREATE POLICY "mi_nuevo_catalogo: admin full access" 
+ON mi_nuevo_catalogo
+FOR ALL TO authenticated 
+USING (get_my_role() = 'admin')
+WITH CHECK (get_my_role() = 'admin');
+
+-- Seed data
+INSERT INTO mi_nuevo_catalogo (nombre, descripcion) VALUES
+  ('Item 1', 'Descripción 1'),
+  ('Item 2', 'Descripción 2');
+```
+
+Run this SQL in Supabase SQL Editor.
+
+### 2. Add TypeScript Types
+
+Update `types/index.ts`:
+
+```typescript
+export interface MiNuevoCatalogo {
+    id: string
+    nombre: string
+    descripcion: string | null
+    activo: boolean
+    created_at: string
+}
+
+// Update Catalogos interface
+export interface Catalogos {
+    proveedores: Proveedor[]
+    productos: Producto[]
+    // ... existing catalogs
+    mi_nuevo_catalogo: MiNuevoCatalogo[]
+}
+```
+
+### 3. Add Validation Schema
+
+Update `lib/validations/schemas.ts`:
+
+```typescript
+export const miNuevoCatalogoSchema = z.object({
+    nombre: z.string().min(2, 'Nombre requerido, mínimo 2 caracteres'),
+    descripcion: z.string().optional(),
+    activo: z.boolean().default(true),
+})
+```
+
+### 4. Create Server Actions
+
+Create `lib/actions/mi-nuevo-catalogo.ts`:
+
+```typescript
+'use server'
+
+import { createClient } from '@/lib/supabase/server'
+import { getCurrentProfile } from './auth'
+import { revalidatePath } from 'next/cache'
+
+export async function createMiNuevoCatalogo(data: { nombre: string; descripcion?: string }) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (profile?.rol !== 'admin') {
+        return { error: 'No tienes permisos' }
+    }
+
+    const { data: result, error } = await supabase
+        .from('mi_nuevo_catalogo')
+        .insert(data)
+        .select()
+        .single()
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/dashboard/catalogos')
+    return { data: result }
+}
+
+export async function getMiNuevoCatalogo() {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('mi_nuevo_catalogo')
+        .select('*')
+        .order('nombre')
+
+    if (error) return { error: error.message }
+    return { data: data ?? [] }
+}
+```
+
+### 5. Update getCatalogos Action
+
+Update `lib/actions/requisiciones.ts`:
+
+```typescript
+export async function getCatalogos() {
+    const supabase = await createClient()
+
+    const [
+        proveedores, 
+        productos, 
+        // ... existing catalogs
+        miNuevoCatalogo
+    ] = await Promise.all([
+        supabase.from('proveedores').select('*').order('nombre'),
+        supabase.from('productos').select('*').order('nombre'),
+        // ... existing catalogs
+        supabase.from('mi_nuevo_catalogo').select('*').order('nombre'),
+    ])
+
+    return {
+        proveedores: proveedores.data ?? [],
+        productos: productos.data ?? [],
+        // ... existing catalogs
+        mi_nuevo_catalogo: miNuevoCatalogo.data ?? [],
+    }
+}
+```
+
+### 6. Add to UI
+
+Update `app/dashboard/catalogos/page.tsx`:
+
+```tsx
+const catalogos = await getCatalogos()
+
+<Tabs defaultValue="proveedores">
+  <TabsList>
+    {/* Existing tabs */}
+    <TabsTrigger value="mi_nuevo_catalogo">Mi Nuevo Catálogo</TabsTrigger>
+  </TabsList>
+  
+  {/* Existing tab content */}
+  
+  <TabsContent value="mi_nuevo_catalogo">
+    <CatalogoTable
+      data={catalogos.mi_nuevo_catalogo}
+      columns={miNuevoCatalogoColumns}
+      onAdd={handleAddMiNuevoCatalogo}
+      onEdit={handleEditMiNuevoCatalogo}
+      onDelete={handleDeleteMiNuevoCatalogo}
+    />
+  </TabsContent>
+</Tabs>
+```
+
+## Extending User Roles
+
+### 1. Update Database Enum
+
+Run in Supabase SQL Editor:
+
+```sql
+-- Add new role to enum
+ALTER TYPE user_role ADD VALUE 'mi_nuevo_rol';
+
+-- Or recreate enum (requires dropping dependent objects)
+DROP TYPE user_role CASCADE;
+CREATE TYPE user_role AS ENUM ('admin', 'coordinadora', 'consulta', 'mi_nuevo_rol');
+
+-- Recreate profiles table
+CREATE TABLE profiles (
+  id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  nombre_completo TEXT,
+  rol             user_role NOT NULL DEFAULT 'consulta',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### 2. Update TypeScript Types
+
+Update `types/index.ts`:
+
+```typescript
+export type UserRole = 
+    | 'admin' 
+    | 'coordinadora' 
+    | 'consulta'
+    | 'mi_nuevo_rol'
+```
+
+### 3. Create RLS Policies
+
+Define permissions for new role:
+
+```sql
+-- Example: Allow mi_nuevo_rol to read requisitions
+CREATE POLICY "mi_nuevo_rol can view requisiciones" ON requisiciones
+  FOR SELECT TO authenticated
+  USING (get_my_role() = 'mi_nuevo_rol');
+
+-- Example: Allow mi_nuevo_rol to update status
+CREATE POLICY "mi_nuevo_rol can update status" ON requisiciones
+  FOR UPDATE TO authenticated
+  USING (get_my_role() = 'mi_nuevo_rol')
+  WITH CHECK (get_my_role() = 'mi_nuevo_rol');
+```
+
+### 4. Update Permission Checks
+
+Update Server Actions:
+
+```typescript
+// lib/actions/requisiciones.ts
+export async function updateRequisicion(id: string, data: Partial<RequisicionFormData>) {
+    const profile = await getCurrentProfile()
+    
+    // Add new role to permission check
+    if (!profile || !['admin', 'coordinadora', 'mi_nuevo_rol'].includes(profile.rol)) {
+        return { error: 'No tienes permisos para editar requisiciones' }
+    }
+    
+    // ... rest of function
+}
+```
+
+### 5. Update UI Based on Role
+
+```tsx
+const { role } = useAuthRole()
+
+{(role === 'admin' || role === 'mi_nuevo_rol') && (
+    <Button onClick={handleSpecialAction}>
+        Acción Especial
+    </Button>
+)}
+```
+
+### 6. Update Sidebar Navigation
+
+Update `components/layout/Sidebar.tsx`:
+
+```tsx
+export function Sidebar() {
+    const { role } = useAuthRole()
+    
+    return (
+        <aside>
+            <nav>
+                {/* ... existing nav items */}
+                
+                {role === 'mi_nuevo_rol' && (
+                    <NavLink href="/dashboard/mi-seccion" icon={Star}>
+                        Mi Sección
+                    </NavLink>
+                )}
+            </nav>
+        </aside>
+    )
+}
+```
+
+## Custom Status Workflows
+
+### 1. Add New Status Values
+
+Update database:
+
+```sql
+INSERT INTO estatus (nombre, color_hex) VALUES
+  ('En Validación',  '#8B5CF6'),
+  ('Aprobado',       '#059669'),
+  ('Rechazado',      '#DC2626');
+```
+
+### 2. Create Status Transition Rules
+
+Define allowed transitions:
+
+```typescript
+// lib/workflows/status-transitions.ts
+export const STATUS_TRANSITIONS: Record<string, string[]> = {
+  'Pendiente': ['Confirmado', 'Cancelado'],
+  'Confirmado': ['En Tránsito', 'Cancelado'],
+  'En Tránsito': ['Recibido', 'En Revisión'],
+  'En Revisión': ['Recibido', 'Rechazado'],
+  'Recibido': [], // Terminal state
+  'Cancelado': [], // Terminal state
+  'Rechazado': ['Pendiente'], // Can retry
+}
+
+export function canTransitionTo(currentStatus: string, newStatus: string): boolean {
+    return STATUS_TRANSITIONS[currentStatus]?.includes(newStatus) ?? false
+}
+```
+
+### 3. Enforce in Server Actions
+
+```typescript
+import { canTransitionTo } from '@/lib/workflows/status-transitions'
+
+export async function updateRequisicionStatus(
+    id: string, 
+    newStatusId: string
+) {
+    const supabase = await createClient()
+    
+    // Get current requisition
+    const { data: requisicion } = await supabase
+        .from('requisiciones')
+        .select('*, estatus:estatus(nombre)')
+        .eq('id', id)
+        .single()
+    
+    if (!requisicion) {
+        return { error: 'Requisición no encontrada' }
+    }
+    
+    // Get new status name
+    const { data: newStatus } = await supabase
+        .from('estatus')
+        .select('nombre')
+        .eq('id', newStatusId)
+        .single()
+    
+    if (!newStatus) {
+        return { error: 'Estatus no válido' }
+    }
+    
+    // Validate transition
+    const currentStatusName = requisicion.estatus.nombre
+    if (!canTransitionTo(currentStatusName, newStatus.nombre)) {
+        return { 
+            error: `No se puede cambiar de "${currentStatusName}" a "${newStatus.nombre}"` 
+        }
+    }
+    
+    // Perform update
+    const { error } = await supabase
+        .from('requisiciones')
+        .update({ estatus_id: newStatusId })
+        .eq('id', id)
+    
+    if (error) return { error: error.message }
+    
+    revalidatePath('/dashboard/calendar')
+    return { success: true }
+}
+```
+
+### 4. Update UI with Allowed Transitions
+
+```tsx
+const currentStatus = requisicion.estatus.nombre
+const allowedTransitions = STATUS_TRANSITIONS[currentStatus] || []
+
+<Select value={statusId} onValueChange={setStatusId}>
+    <SelectTrigger>
+        <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+        {estatus
+            .filter(s => allowedTransitions.includes(s.nombre))
+            .map(s => (
+                <SelectItem key={s.id} value={s.id}>
+                    {s.nombre}
+                </SelectItem>
+            ))
+        }
+    </SelectContent>
+</Select>
+```
+
+## Adding New Pages
+
+### 1. Create Page File
+
+```bash
+# Create new route
+mkdir -p app/dashboard/mi-pagina
+touch app/dashboard/mi-pagina/page.tsx
+```
+
+### 2. Implement Page
+
+```tsx
+// app/dashboard/mi-pagina/page.tsx
+import { getCurrentProfile } from '@/lib/actions/auth'
+import { redirect } from 'next/navigation'
+
+export default async function MiPaginaPage() {
+    const profile = await getCurrentProfile()
+    
+    if (!profile) {
+        redirect('/login')
+    }
+    
+    return (
+        <div className="p-6">
+            <h1 className="text-2xl font-bold mb-4">Mi Página</h1>
+            <p>Contenido personalizado para {profile.nombre_completo}</p>
+        </div>
+    )
+}
+```
+
+### 3. Add to Navigation
+
+Update `components/layout/Sidebar.tsx`:
+
+```tsx
+<NavLink href="/dashboard/mi-pagina" icon={FileText}>
+    Mi Página
+</NavLink>
+```
+
+## Customizing Calendar View
+
+### FullCalendar Configuration
+
+Update `components/calendar/CalendarView.tsx`:
+
+```tsx
+<FullCalendar
+    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+    initialView="dayGridMonth"
+    headerToolbar={{
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+    }}
+    locale="es"
+    firstDay={1}  // Monday
+    slotMinTime="08:00:00"
+    slotMaxTime="18:00:00"
+    businessHours={{
+        daysOfWeek: [1, 2, 3, 4, 5],
+        startTime: '08:00',
+        endTime: '17:00'
+    }}
+    events={events}
+    eventClick={handleEventClick}
+    editable={true}
+    selectable={true}
+/>
+```
+
+### Custom Event Rendering
+
+```tsx
+eventContent={(arg) => {
+    const { event } = arg
+    const { proveedor_nombre, estatus_nombre } = event.extendedProps
+    
+    return (
+        <div className="p-1 text-xs">
+            <div className="font-bold truncate">{proveedor_nombre}</div>
+            <div className="text-gray-600 truncate">{event.title}</div>
+            <div className="text-gray-500">{estatus_nombre}</div>
+        </div>
+    )
+}
+```
+
+## Adding Email Notifications
+
+### 1. Install Email Service
+
+```bash
+npm install @sendgrid/mail
+# or
+npm install nodemailer
+```
+
+### 2. Create Email Action
+
+```typescript
+// lib/actions/notifications.ts
+'use server'
+
+import sgMail from '@sendgrid/mail'
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY!)
+
+export async function sendStatusChangeEmail(
+    recipientEmail: string,
+    requisicionId: string,
+    oldStatus: string,
+    newStatus: string
+) {
+    const msg = {
+        to: recipientEmail,
+        from: 'notificaciones@clorohidalgo.com',
+        subject: 'Cambio de estatus en requisición',
+        html: `
+            <h1>Actualización de Requisición</h1>
+            <p>La requisición ${requisicionId} cambió de:</p>
+            <p><strong>${oldStatus}</strong> → <strong>${newStatus}</strong></p>
+        `,
+    }
+    
+    try {
+        await sgMail.send(msg)
+        return { success: true }
+    } catch (error) {
+        console.error('Error sending email:', error)
+        return { error: 'No se pudo enviar el correo' }
+    }
+}
+```
+
+### 3. Call from Server Action
+
+```typescript
+export async function updateRequisicion(id: string, data: Partial<RequisicionFormData>) {
+    // ... update logic
+    
+    // Send notification
+    if (data.estatus_id && data.estatus_id !== oldStatusId) {
+        await sendStatusChangeEmail(
+            userEmail,
+            id,
+            oldStatus.nombre,
+            newStatus.nombre
+        )
+    }
+    
+    return { data: result }
+}
+```
+
+## Best Practices
+
+<Steps>
+
+### Keep Changes Modular
+
+Organize customizations in separate files:
+- New catalogs → `lib/actions/[catalog-name].ts`
+- Custom workflows → `lib/workflows/`
+- Email templates → `lib/templates/`
+
+### Document Custom Code
+
+Add comments for custom logic:
+
+```typescript
+// CUSTOM: Added by [Your Name] on [Date]
+// Purpose: Allow special users to bypass approval
+export async function customApprovalLogic() {
+    // ...
+}
+```
+
+### Test Thoroughly
+
+Before deploying customizations:
+1. Test in development
+2. Verify RLS policies
+3. Check all user roles
+4. Test error scenarios
+5. Deploy to preview environment first
+
+### Version Control
+
+Use Git branches for customizations:
+
+```bash
+git checkout -b feature/custom-catalog
+# Make changes
+git add .
+git commit -m "Add custom catalog for [Feature]"
+git push origin feature/custom-catalog
+```
+
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Components" icon="puzzle-piece" href="/development/components">
+    Learn about UI components
+  </Card>
+  <Card title="Server Actions" icon="server" href="/development/server-actions">
+    Understand data operations
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/development/deployment">
+    Deploy your customizations
+  </Card>
+  <Card title="Project Structure" icon="folder-tree" href="/development/project-structure">
+    Navigate the codebase
+  </Card>
+</CardGroup>

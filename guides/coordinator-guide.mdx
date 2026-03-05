@@ -1,0 +1,549 @@
+---
+title: 'Coordinator Guide'
+description: 'Complete guide for coordinators managing requisitions, supplier communications, and delivery scheduling'
+icon: 'calendar-check'
+---
+
+## Overview
+
+As a **Coordinator (Coordinadora)**, you are responsible for creating and managing purchase requisitions, communicating with suppliers, confirming delivery dates, and ensuring smooth procurement operations. You are the bridge between the organization's material needs and supplier deliveries.
+
+<Note>
+Coordinators have full create, read, update, and delete (CRUD) permissions for requisitions and can manage the entire procurement lifecycle.
+</Note>
+
+## Key Responsibilities
+
+<CardGroup cols={2}>
+  <Card title="Requisition Creation" icon="file-plus">
+    Create new purchase requisitions with complete material and delivery information
+  </Card>
+  <Card title="Supplier Communication" icon="phone">
+    Coordinate with suppliers to confirm delivery dates and track shipment status
+  </Card>
+  <Card title="Calendar Management" icon="calendar">
+    Maintain an accurate delivery calendar and monitor upcoming receipts
+  </Card>
+  <Card title="Status Updates" icon="refresh">
+    Update requisition status as deliveries progress from pending to received
+  </Card>
+</CardGroup>
+
+## Creating New Requisitions
+
+### Accessing the Requisition Form
+
+You can create requisitions from two locations:
+
+<Steps>
+  <Step title="From Calendar View">
+    Navigate to `/dashboard/calendar` and click the **"+ Nueva Requisición"** button
+  </Step>
+  
+  <Step title="From Table View">
+    Navigate to `/dashboard/requisiciones` and click the **"+ Nueva Requisición"** button in the top-right
+  </Step>
+</Steps>
+
+### Completing the Requisition Form
+
+The requisition form is organized into logical sections:
+
+<Accordion title="Section 1: Requisition Data (Manual Entry)">
+  This section contains fields typically copied from Excel or supplier documentation:
+  
+  **№ REQUI**: Requisition number (e.g., F0000)  
+  **FECHA DE OC**: Purchase order date  
+  **FOLIO OC**: Purchase order number (e.g., GG-01000)  
+  **FECHA SOLICITADA**: Requested delivery date  
+  **FECHA CONFIRMADA** ⭐: Confirmed delivery date (required for calendar display)  
+  **FACTURA / REMISIÓN**: Invoice or shipping document number
+  
+  <Tip>
+  The **Fecha Confirmada** is the most important date - it determines when the delivery appears on the calendar and triggers notifications.
+  </Tip>
+</Accordion>
+
+<Accordion title="Section 2: Material Details (Catalog Selection)">
+  Select from existing catalog values or quickly add new ones:
+  
+  **PROVEEDOR** *: Supplier company (required)  
+  **PRODUCTO** *: Product/material name (required)  
+  **PRESENTACIÓN** *: Packaging type (required)  
+  **DESTINO** *: Delivery location (required)  
+  **ESTATUS** *: Current status (required)  
+  **CANTIDAD Y UNIDAD** *: Quantity and unit of measure (required)
+  
+  Each field has a **+** button to quickly add new catalog entries without leaving the form.
+</Accordion>
+
+<Accordion title="Section 3: Delivery Information">
+  Complete when the delivery is received:
+  
+  **FECHA ENTREGADO**: Actual delivery date  
+  **CANTIDAD ENTREGADA**: Actual quantity received
+  
+  <Note>
+  These fields are typically filled by CEDIS or Laboratory staff when receiving the delivery, but you can also update them.
+  </Note>
+</Accordion>
+
+<Accordion title="Section 4: Comments">
+  **COMENTARIOS / NOTAS**: Free-text field for:
+  - Special handling instructions
+  - Partial delivery notes
+  - Quality requirements
+  - Supplier communication notes
+</Accordion>
+
+### Step-by-Step: Creating a Requisition
+
+<Steps>
+  <Step title="Click Nueva Requisición">
+    From the calendar or table view, click **"+ Nueva Requisición"**
+  </Step>
+  
+  <Step title="Enter Basic Information">
+    Fill in:
+    - № Requi (if available)
+    - Fecha de OC
+    - Folio OC
+    - Fecha Solicitada
+    - **Fecha Confirmada** (most important!)
+  </Step>
+  
+  <Step title="Select Material Details">
+    Choose from dropdowns:
+    - Proveedor (supplier)
+    - Producto (product)
+    - Presentación (packaging)
+    - Destino (delivery location)
+    - Estatus (usually "Pendiente" or "Confirmado")
+  </Step>
+  
+  <Step title="Enter Quantity">
+    Input:
+    - Cantidad Solicitada (e.g., 500)
+    - Unidad de Medida (e.g., kg, L, pza)
+  </Step>
+  
+  <Step title="Add Comments (Optional)">
+    Include any special instructions or notes
+  </Step>
+  
+  <Step title="Save Requisition">
+    Click **"Generar Nueva Requisición"** to create the entry
+  </Step>
+</Steps>
+
+<Tip>
+If a supplier, product, or other catalog value doesn't exist, click the **+** button next to the dropdown to add it instantly without leaving the form.
+</Tip>
+
+## Managing Existing Requisitions
+
+### Finding Requisitions
+
+Use the calendar view (`/dashboard/calendar`) or table view (`/dashboard/requisiciones`) to locate requisitions:
+
+**Calendar View Benefits:**
+- Visual timeline of deliveries
+- Color-coded by status
+- Quick overview of upcoming receipts
+- Filter by status using the legend
+
+**Table View Benefits:**
+- Detailed list with all fields visible
+- Advanced filtering by supplier, destination, status
+- Sort by date, quantity, or other columns
+- Excel-like layout for data review
+
+### Editing Requisitions
+
+<Steps>
+  <Step title="Locate Requisition">
+    Find the requisition in calendar or table view
+  </Step>
+  
+  <Step title="Open Edit Form">
+    - In calendar view: Click the event, then click **"Editar"**
+    - In table view: Click the pencil icon in the Actions column
+  </Step>
+  
+  <Step title="Modify Fields">
+    Update any information:
+    - Change dates if delivery is rescheduled
+    - Update status as shipment progresses
+    - Adjust quantities if needed
+    - Add comments with new information
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **"Guardar Cambios"** - an audit trail entry is automatically created showing what changed
+  </Step>
+</Steps>
+
+<Note>
+Every edit creates an audit trail entry with your name, timestamp, and a record of what fields changed (from X to Y). This ensures full traceability.
+</Note>
+
+### Deleting Requisitions
+
+If a requisition was created in error:
+
+<Steps>
+  <Step title="Open Requisition Detail">
+    Click the requisition to open the detail modal
+  </Step>
+  
+  <Step title="Click Delete Icon">
+    Click the trash icon in the bottom-left corner
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    Click **"Sí, borrar"** to permanently delete the requisition
+  </Step>
+</Steps>
+
+<Warning>
+Deletion is permanent and cannot be undone. Only delete requisitions that were created by mistake. For canceled orders, update the status instead.
+</Warning>
+
+## Confirming Delivery Dates
+
+The most critical coordinator task is confirming delivery dates with suppliers.
+
+### Why Confirmation Matters
+
+✓ Requisitions **only appear on the calendar** if they have a confirmed date  
+✓ The **CEDIS and Laboratory teams** rely on the calendar to prepare for receipts  
+✓ **Upcoming Deliveries** sidebar shows only confirmed deliveries  
+✓ **Notifications** (if configured) are triggered based on confirmed dates
+
+### Workflow for Confirmation
+
+<Steps>
+  <Step title="Create Initial Requisition">
+    Create the requisition with available information (PO number, requested date, etc.)
+  </Step>
+  
+  <Step title="Contact Supplier">
+    Call or email the supplier to confirm when the material will be delivered
+  </Step>
+  
+  <Step title="Update Fecha Confirmada">
+    Edit the requisition and enter the **Fecha Confirmada** (confirmed delivery date)
+  </Step>
+  
+  <Step title="Update Status">
+    Change status from "Pendiente" to "Confirmado" once the supplier confirms
+  </Step>
+  
+  <Step title="Monitor Calendar">
+    The requisition now appears on the calendar on the confirmed date
+  </Step>
+</Steps>
+
+<Tip>
+If a supplier changes the delivery date, immediately update the Fecha Confirmada field so the calendar reflects the new schedule.
+</Tip>
+
+## Using the Calendar View
+
+### Calendar Features
+
+The calendar at `/dashboard/calendar` is your primary workspace:
+
+- **Month/Week/Day views**: Switch between time periods
+- **Color-coded events**: Each status has a unique color
+- **Click events** to view details or edit
+- **Filter by status** using the legend (top-right)
+- **Filter by supplier/destination** using the sidebar (right)
+- **Upcoming Deliveries** panel shows next 7 days
+
+### Calendar Color Legend
+
+<CardGroup cols={2}>
+  <Card title="Pendiente" icon="clock">
+    Yellow - Awaiting supplier confirmation
+  </Card>
+  <Card title="Confirmado" icon="check">
+    Blue - Supplier confirmed, delivery scheduled
+  </Card>
+  <Card title="En Tránsito" icon="truck">
+    Orange - Shipment in transit
+  </Card>
+  <Card title="Recibido" icon="circle-check">
+    Green - Delivery received and confirmed
+  </Card>
+</CardGroup>
+
+### Filtering the Calendar
+
+<Steps>
+  <Step title="Filter by Status">
+    Click status badges in the legend to show/hide specific statuses
+  </Step>
+  
+  <Step title="Filter by Supplier">
+    Use the sidebar dropdown to show only one supplier's deliveries
+  </Step>
+  
+  <Step title="Filter by Destination">
+    Filter by delivery location to focus on specific warehouses
+  </Step>
+  
+  <Step title="Filter by Date Range">
+    Use the date pickers in the sidebar to show a specific time period
+  </Step>
+</Steps>
+
+## Status Management
+
+### Understanding Requisition Statuses
+
+Requisitions typically follow this lifecycle:
+
+<Steps>
+  <Step title="Pendiente (Pending)">
+    Initial status when created. Waiting for supplier confirmation.
+  </Step>
+  
+  <Step title="Confirmado (Confirmed)">
+    Supplier has confirmed delivery date. Appears on calendar.
+  </Step>
+  
+  <Step title="En Tránsito (In Transit)">
+    Material has shipped and is on the way.
+  </Step>
+  
+  <Step title="Recibido (Received)">
+    Delivery received at destination. CEDIS/Lab confirms receipt.
+  </Step>
+</Steps>
+
+### When to Update Status
+
+**Pendiente → Confirmado**:
+- After supplier confirms delivery date
+- Update the Fecha Confirmada field at the same time
+
+**Confirmado → En Tránsito**:
+- When supplier notifies that shipment has departed
+- Add tracking information to comments if available
+
+**En Tránsito → Recibido**:
+- After CEDIS or Laboratory confirms receipt
+- Update Fecha Entregado and Cantidad Entregada fields
+
+<Note>
+While you can update status at any stage, CEDIS and Laboratory teams typically update to "Recibido" when they physically receive the delivery.
+</Note>
+
+## Communicating with Suppliers
+
+### Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Confirm Dates Promptly" icon="calendar-check">
+    Contact suppliers within 24 hours of creating a requisition to get confirmed dates
+  </Card>
+  
+  <Card title="Document Everything" icon="file-text">
+    Use the Comments field to record:
+    - Who you spoke with
+    - Date and time of communication
+    - Any special instructions
+    - Changes to original order
+  </Card>
+  
+  <Card title="Track Changes" icon="history">
+    If delivery dates change, immediately update the Fecha Confirmada and add a comment explaining why
+  </Card>
+  
+  <Card title="Follow Up" icon="bell">
+    Check the Upcoming Deliveries sidebar daily to ensure suppliers are on schedule
+  </Card>
+</CardGroup>
+
+### Using Comments Effectively
+
+The Comments field is your communication log. Example entries:
+
+```
+2024-03-15: Hablé con Juan (Proveedor XYZ). 
+Confirmó entrega para 22-Mar. Camión sale mañana.
+
+2024-03-20: Llamada de seguimiento. En tránsito, 
+llega viernes. Actualizando estatus.
+
+2024-03-22: Recibido parcial - solo 450kg de 500kg. 
+Faltante viene la próxima semana.
+```
+
+## Handling Common Scenarios
+
+<Accordion title="Supplier Changes Delivery Date">
+  **Scenario**: Supplier calls to reschedule delivery from March 20 to March 25.
+  
+  **Action**:
+  1. Edit the requisition
+  2. Update **Fecha Confirmada** from March 20 to March 25
+  3. Add comment: "Supplier rescheduled due to [reason]. Confirmed new date: March 25."
+  4. Update status if needed (e.g., back to "Confirmado" if it was "En Tránsito")
+  5. Notify CEDIS/Laboratory of the change
+</Accordion>
+
+<Accordion title="Partial Delivery Received">
+  **Scenario**: CEDIS reports receiving only 450 kg out of 500 kg ordered.
+  
+  **Action**:
+  1. Edit the requisition
+  2. Keep **Cantidad Solicitada** at 500
+  3. Set **Cantidad Entregada** to 450
+  4. Set **Fecha Entregado** to today's date
+  5. Update status to "Recibido"
+  6. Add comment: "Partial delivery. 450kg received on [date]. Remaining 50kg expected [date]."
+  7. Create a NEW requisition for the remaining 50 kg if needed
+</Accordion>
+
+<Accordion title="Order Cancelled">
+  **Scenario**: Purchase order is cancelled before delivery.
+  
+  **Action**:
+  1. Edit the requisition
+  2. Change status to a custom "Cancelado" status (ask admin to create if it doesn't exist)
+  3. Add comment explaining cancellation reason
+  4. DO NOT delete - keep for record-keeping
+</Accordion>
+
+<Accordion title="Urgent Rush Order">
+  **Scenario**: Need to expedite a delivery due to production urgency.
+  
+  **Action**:
+  1. Create requisition immediately with all available information
+  2. Mark status as "Confirmado" even if not fully confirmed
+  3. Enter estimated **Fecha Confirmada**
+  4. Add comment: "URGENT - Rush order due to [reason]. Expedited delivery requested."
+  5. Follow up with supplier via phone immediately
+  6. Update dates once confirmed
+</Accordion>
+
+## Quick Add Catalog Entries
+
+When creating a requisition, if a supplier, product, or other value doesn't exist:
+
+<Steps>
+  <Step title="Click + Button">
+    Click the **+** icon next to the dropdown field
+  </Step>
+  
+  <Step title="Enter Information">
+    A quick-add modal appears:
+    - For Proveedor: Enter company name
+    - For Producto: Enter name and optional description
+    - For Presentación: Enter packaging type
+    - For Destino: Enter location name
+    - For Unidad: Enter name and abbreviation
+  </Step>
+  
+  <Step title="Create">
+    Click **"Crear"** - the new entry is automatically selected in the form
+  </Step>
+</Steps>
+
+<Tip>
+This feature saves time and ensures you never have to leave the requisition form to add missing catalog values.
+</Tip>
+
+## Monitoring Upcoming Deliveries
+
+The **Upcoming Deliveries** panel on the calendar page shows:
+
+- Next 7 days of confirmed deliveries
+- Supplier name, product, quantity
+- Delivery date and destination
+- Status indicator
+
+**Use this panel to:**
+- Plan your week
+- Identify deliveries needing follow-up
+- Ensure CEDIS/Laboratory are prepared
+- Spot potential schedule conflicts
+
+<Tip>
+Check the Upcoming Deliveries panel every morning to stay ahead of your daily tasks.
+</Tip>
+
+## Using Filters in Table View
+
+The table view at `/dashboard/requisiciones` includes a powerful filter bar:
+
+<Steps>
+  <Step title="Access Filter Bar">
+    The filter bar appears at the top of the table view
+  </Step>
+  
+  <Step title="Filter by Supplier">
+    Select a supplier to show only their requisitions
+  </Step>
+  
+  <Step title="Filter by Destination">
+    Select a destination to focus on specific locations
+  </Step>
+  
+  <Step title="Filter by Status">
+    Select a status to see only pending, confirmed, or received orders
+  </Step>
+  
+  <Step title="Filter by Date Range">
+    Set start and end dates to view a specific time period
+  </Step>
+  
+  <Step title="Search">
+    Use the search box to find requisitions by product name, PO number, or other text
+  </Step>
+</Steps>
+
+## Tips for Coordinators
+
+<Tip>
+**Daily Routine**: Start each day by checking the calendar for today's deliveries, reviewing upcoming deliveries for the week, and following up on pending confirmations.
+</Tip>
+
+<Tip>
+**Confirm Early**: Contact suppliers as soon as a PO is issued. Early confirmation prevents last-minute surprises.
+</Tip>
+
+<Tip>
+**Update Immediately**: When a supplier gives you information, update the requisition right away. Don't wait until end of day.
+</Tip>
+
+<Tip>
+**Use Comments Liberally**: Document all supplier communications in the comments field. Future you will thank present you.
+</Tip>
+
+<Tip>
+**Color Coding**: Learn the status colors by heart - it makes scanning the calendar much faster.
+</Tip>
+
+<Tip>
+**Mobile Access**: The calendar is mobile-responsive. You can check deliveries and add comments from your phone if needed.
+</Tip>
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="Admin Guide" icon="shield" href="/guides/admin-guide">
+    Learn about catalog management and user administration
+  </Card>
+  <Card title="Laboratory Guide" icon="flask" href="/guides/laboratory-guide">
+    Understand how Lab validates deliveries
+  </Card>
+  <Card title="CEDIS Guide" icon="warehouse" href="/guides/cedis-guide">
+    Review receiving procedures
+  </Card>
+  <Card title="Calendar Features" icon="calendar" href="/features/calendar">
+    Deep dive into calendar functionality
+  </Card>
+</CardGroup>

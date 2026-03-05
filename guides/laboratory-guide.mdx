@@ -1,0 +1,552 @@
+---
+title: 'Laboratory Guide'
+description: 'Complete guide for laboratory personnel performing technical validation and quality control on material deliveries'
+icon: 'flask'
+---
+
+## Overview
+
+As a **Laboratory Technician (Laboratorio)**, you are responsible for technical validation, quality control, and monitoring material deliveries that require laboratory inspection. Your role ensures that incoming materials meet quality standards before being approved for production use.
+
+<Note>
+Laboratory users have **view and edit permissions** but cannot create new requisitions or delete existing ones. You can update delivery status, add quality notes, and track material receipts.
+</Note>
+
+## Key Responsibilities
+
+<CardGroup cols={2}>
+  <Card title="Technical Validation" icon="microscope">
+    Inspect and validate material quality upon delivery
+  </Card>
+  <Card title="Quality Control" icon="shield-check">
+    Verify materials meet specifications and safety standards
+  </Card>
+  <Card title="Delivery Monitoring" icon="bell">
+    Track incoming deliveries requiring laboratory inspection
+  </Card>
+  <Card title="Status Updates" icon="clipboard-check">
+    Update requisition status after quality validation is complete
+  </Card>
+</CardGroup>
+
+## Accessing the System
+
+### Dashboard Overview
+
+After logging in, you have access to:
+
+- **Calendar** (`/dashboard/calendar`): Visual timeline of deliveries
+- **Requisiciones** (`/dashboard/requisiciones`): Table view of all requisitions
+- **Catálogos** (`/dashboard/catalogos`): View-only access to product catalogs
+
+<Note>
+You will **not** see the "Administración" option in the sidebar - that's reserved for Administrators and Coordinators.
+</Note>
+
+## Monitoring Incoming Deliveries
+
+### Using the Calendar View
+
+The calendar at `/dashboard/calendar` is your primary tool for monitoring deliveries:
+
+<Steps>
+  <Step title="Navigate to Calendar">
+    Click **"Calendario"** in the sidebar or go to `/dashboard/calendar`
+  </Step>
+  
+  <Step title="Review Upcoming Deliveries">
+    Check the **"Upcoming Deliveries"** panel on the right sidebar for deliveries in the next 7 days
+  </Step>
+  
+  <Step title="Identify Materials for Lab Review">
+    Look for deliveries with:
+    - Status: "Confirmado" or "En Tránsito"
+    - Destino: "Laboratorio" or materials requiring quality validation
+  </Step>
+  
+  <Step title="Click Event for Details">
+    Click any calendar event to view full requisition details
+  </Step>
+</Steps>
+
+### Calendar Color Codes
+
+Learn these status colors to quickly scan deliveries:
+
+<CardGroup cols={2}>
+  <Card title="Pendiente" icon="clock">
+    🟡 Yellow - Awaiting confirmation
+  </Card>
+  <Card title="Confirmado" icon="check">
+    🔵 Blue - Confirmed, prepare for receipt
+  </Card>
+  <Card title="En Tránsito" icon="truck">
+    🟠 Orange - Shipment arriving soon
+  </Card>
+  <Card title="Recibido" icon="circle-check">
+    🟢 Green - Received and validated
+  </Card>
+</CardGroup>
+
+### Filtering for Laboratory Deliveries
+
+Focus on deliveries relevant to your area:
+
+<Steps>
+  <Step title="Use Destination Filter">
+    In the right sidebar, filter by **Destino** → "Laboratorio" to see only lab deliveries
+  </Step>
+  
+  <Step title="Filter by Status">
+    Click status badges in the legend to show only "Confirmado" or "En Tránsito" deliveries that need attention
+  </Step>
+  
+  <Step title="Use Date Range">
+    Set date filters to focus on current week or month
+  </Step>
+</Steps>
+
+<Tip>
+Set up your preferred filters (Destination: Laboratorio, Status: Confirmado) each morning to see only deliveries requiring your attention.
+</Tip>
+
+## Validating Material Deliveries
+
+### When a Delivery Arrives
+
+When CEDIS notifies you of a material arrival requiring laboratory validation:
+
+<Steps>
+  <Step title="Locate the Requisition">
+    Find the requisition in the calendar or table view by:
+    - Supplier name
+    - Product name
+    - Delivery date
+    - PO number (Folio OC)
+  </Step>
+  
+  <Step title="Review Details">
+    Click the requisition to view:
+    - Product specifications
+    - Expected quantity and unit
+    - Packaging type
+    - Any special instructions in comments
+  </Step>
+  
+  <Step title="Perform Physical Inspection">
+    Conduct your standard quality control procedures:
+    - Visual inspection
+    - Sample testing
+    - Documentation verification (COA, MSDS, etc.)
+    - Quantity verification
+  </Step>
+  
+  <Step title="Update the Requisition">
+    Based on inspection results, update the requisition with findings
+  </Step>
+</Steps>
+
+### Updating Requisition After Validation
+
+<Steps>
+  <Step title="Open Edit Form">
+    Click the requisition, then click **"Editar"** button
+  </Step>
+  
+  <Step title="Update Delivery Information">
+    Fill in the **Delivery Information** section:
+    - **Fecha Entregado**: Today's date (when validation completed)
+    - **Cantidad Entregada**: Actual quantity received and validated
+  </Step>
+  
+  <Step title="Update Status">
+    Change **Estatus** to:
+    - **"Recibido"** if quality validation passed
+    - Keep as **"En Tránsito"** or create custom status like "En Revisión Lab" if validation is pending
+  </Step>
+  
+  <Step title="Add Quality Notes">
+    In the **Comentarios** field, add:
+    - Validation date and technician name
+    - Quality control results (Pass/Fail)
+    - Any deviations or issues found
+    - Certificate of Analysis (COA) number if applicable
+    - Approval or rejection notes
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **"Guardar Cambios"** to update the requisition
+  </Step>
+</Steps>
+
+<Note>
+Your updates create an automatic audit trail entry showing who made changes and when. This ensures traceability for quality documentation.
+</Note>
+
+### Example Quality Control Comments
+
+Good documentation practices:
+
+```
+2024-03-15 - Lab Validation Completed by [Your Name]
+- COA #: 2024-0315-XYZ
+- Visual inspection: PASS
+- pH test: 7.2 (within spec 7.0-7.5)
+- Purity: 98.5% (spec: min 98%)
+- Quantity verified: 500 kg received, matches PO
+- APPROVED for production use
+- Stored in warehouse A-15
+```
+
+For rejected materials:
+
+```
+2024-03-15 - Lab Validation FAILED by [Your Name]
+- COA #: 2024-0315-ABC
+- Visual inspection: FAIL - visible contamination
+- pH test: 8.5 (out of spec 7.0-7.5)
+- REJECTED - contacted coordinator for supplier return
+- Batch quarantined in area Q-2
+- Replacement order needed
+```
+
+## Handling Different Validation Scenarios
+
+<Accordion title="Material Passes Quality Control">
+  **Scenario**: Material arrives, inspection passes all quality checks.
+  
+  **Action**:
+  1. Edit the requisition
+  2. Set **Fecha Entregado** to today
+  3. Confirm **Cantidad Entregada** matches physical count
+  4. Change **Estatus** to "Recibido"
+  5. Add comment with validation results and COA reference
+  6. Save changes
+  
+  Result: Material is approved for production, requisition marked complete.
+</Accordion>
+
+<Accordion title="Material Fails Quality Control">
+  **Scenario**: Material fails quality tests, does not meet specifications.
+  
+  **Action**:
+  1. Edit the requisition
+  2. Set **Fecha Entregado** to today (arrival date, even if rejected)
+  3. Set **Cantidad Entregada** to 0 (material not accepted)
+  4. Keep **Estatus** as "En Tránsito" or change to custom "Rechazado" status
+  5. Add detailed comment explaining:
+     - Why material failed
+     - What tests were out of spec
+     - Next steps (return to supplier, replacement needed)
+  6. Save and immediately notify Coordinator
+  
+  Result: Coordinator can contact supplier for replacement or return.
+</Accordion>
+
+<Accordion title="Partial Delivery or Discrepancy">
+  **Scenario**: Expected 500 kg, received only 450 kg.
+  
+  **Action**:
+  1. Edit the requisition
+  2. Keep **Cantidad Solicitada** at 500 (original order)
+  3. Set **Cantidad Entregada** to 450 (actual received)
+  4. Set **Fecha Entregado** to today
+  5. Change **Estatus** to "Recibido" (partial receipt counts as received)
+  6. Add comment: "Partial delivery. Validated 450 kg, missing 50 kg. Notified coordinator."
+  7. Save and notify Coordinator
+  
+  Result: System tracks the discrepancy, Coordinator can follow up with supplier.
+</Accordion>
+
+<Accordion title="Material Requires Extended Testing">
+  **Scenario**: Material needs 3-5 days of testing before approval.
+  
+  **Action**:
+  1. When material arrives, edit the requisition
+  2. Add comment: "Material received [date]. Extended testing in progress. Expected completion [date]."
+  3. Keep **Estatus** as "En Tránsito" or ask admin to create "En Validación Lab" status
+  4. Do NOT set **Fecha Entregado** yet
+  5. When testing completes, edit again:
+     - Set **Fecha Entregado** to completion date
+     - Set **Cantidad Entregada** based on results
+     - Update **Estatus** to "Recibido" or "Rechazado"
+     - Add final validation results in comments
+  
+  Result: Requisition accurately reflects validation timeline.
+</Accordion>
+
+## Using the Table View
+
+The table view at `/dashboard/requisiciones` provides a spreadsheet-like interface:
+
+### Table View Benefits
+
+- **See all fields** at once without clicking
+- **Sort columns** by date, supplier, product, quantity
+- **Filter** by multiple criteria simultaneously
+- **Quick status check** with color-coded badges
+- **Pending quantity** calculation automatically shown
+
+### Key Columns for Laboratory Review
+
+| Column | What to Check |
+|--------|---------------|
+| **Fecha Conf.** | When delivery is expected |
+| **Fecha Ent.** | When delivery was received (blank if pending) |
+| **Cant. Ent.** | Quantity received (blank if not yet validated) |
+| **Cant. Pend.** | Difference between ordered and received |
+| **Estatus** | Current workflow stage |
+| **Destino** | Delivery location (filter for "Laboratorio") |
+
+### Filtering in Table View
+
+<Steps>
+  <Step title="Open Filter Bar">
+    The filter bar appears at the top of the table
+  </Step>
+  
+  <Step title="Filter by Destination">
+    Select "Laboratorio" to see only lab deliveries
+  </Step>
+  
+  <Step title="Filter by Status">
+    Select "Confirmado" or "En Tránsito" to see pending validations
+  </Step>
+  
+  <Step title="Set Date Range">
+    Show deliveries for current week or month
+  </Step>
+</Steps>
+
+<Tip>
+Use the table view for end-of-day review to ensure all deliveries that arrived today have been validated and updated.
+</Tip>
+
+## Collaborating with CEDIS and Coordinators
+
+### Communication Workflow
+
+<Steps>
+  <Step title="CEDIS Receives Material">
+    CEDIS team receives physical delivery and notifies Laboratory
+  </Step>
+  
+  <Step title="Laboratory Validation">
+    You perform quality control and update requisition status
+  </Step>
+  
+  <Step title="Coordinator Monitoring">
+    Coordinator monitors for issues or supplier follow-up needs
+  </Step>
+</Steps>
+
+### Best Practices for Team Collaboration
+
+<CardGroup cols={2}>
+  <Card title="Document Thoroughly" icon="file-text">
+    Use comments field for detailed quality notes - CEDIS and Coordinators read these
+  </Card>
+  
+  <Card title="Update Promptly" icon="clock">
+    Update requisitions same day as validation to keep everyone informed
+  </Card>
+  
+  <Card title="Notify on Issues" icon="bell">
+    If material is rejected, update system AND call/email Coordinator immediately
+  </Card>
+  
+  <Card title="Use Consistent Format" icon="check-square">
+    Standardize your comment format so team can quickly scan for key info
+  </Card>
+</CardGroup>
+
+### When to Contact Coordinator
+
+Notify the Coordinator immediately if:
+
+- Material **fails quality control** → Supplier return or replacement needed
+- **Partial delivery** with significant shortage → Coordinator follows up with supplier
+- **Wrong product delivered** → Coordinator coordinates exchange
+- **Damaged packaging** compromising quality → Document and escalate
+- **Missing documentation** (COA, MSDS) → Coordinator requests from supplier
+
+<Tip>
+Always update the requisition in the system first, then follow up with direct communication. This ensures everyone has access to the information.
+</Tip>
+
+## Understanding Your Permissions
+
+### What You Can Do
+
+✓ **View** all requisitions in calendar and table views  
+✓ **Edit** requisitions to update delivery info and add comments  
+✓ **Update status** from "En Tránsito" to "Recibido"  
+✓ **Add comments** with validation results  
+✓ **View catalogs** (products, suppliers, destinations, etc.)  
+✓ **Use filters** to focus on relevant deliveries
+
+### What You Cannot Do
+
+✗ **Create** new requisitions (only Admin and Coordinator)  
+✗ **Delete** requisitions (only Admin and Coordinator)  
+✗ **Edit catalogs** (only Admin and Coordinator)  
+✗ **Manage users** (only Admin)  
+✗ **Edit Fecha Confirmada** field (only Admin and Coordinator)
+
+<Note>
+If you need to create a requisition or modify restricted fields, contact your Coordinator or Administrator.
+</Note>
+
+## Daily Workflow Recommendations
+
+### Morning Routine
+
+<Steps>
+  <Step title="Check Calendar">
+    Open `/dashboard/calendar` and review today's expected deliveries
+  </Step>
+  
+  <Step title="Filter for Lab Deliveries">
+    Apply Destination filter: "Laboratorio" and Status filter: "Confirmado" or "En Tránsito"
+  </Step>
+  
+  <Step title="Review Upcoming Deliveries">
+    Check the sidebar for next 7 days to plan your testing schedule
+  </Step>
+  
+  <Step title="Prepare for Arrivals">
+    Gather testing equipment and documentation needed for expected materials
+  </Step>
+</Steps>
+
+### When Material Arrives
+
+<Steps>
+  <Step title="Locate Requisition">
+    Find the entry in the system by supplier, product, or PO number
+  </Step>
+  
+  <Step title="Perform Validation">
+    Conduct quality control according to your laboratory SOPs
+  </Step>
+  
+  <Step title="Update Requisition">
+    Edit to add delivery date, quantity, status, and quality notes
+  </Step>
+  
+  <Step title="Notify if Needed">
+    Contact Coordinator if there are any issues or rejections
+  </Step>
+</Steps>
+
+### End-of-Day Review
+
+<Steps>
+  <Step title="Switch to Table View">
+    Go to `/dashboard/requisiciones` for spreadsheet overview
+  </Step>
+  
+  <Step title="Verify All Updates">
+    Confirm all deliveries received today have been validated and updated
+  </Step>
+  
+  <Step title="Check Pending Validations">
+    Look for materials in "En Tránsito" status that require follow-up tomorrow
+  </Step>
+</Steps>
+
+## Tips for Laboratory Users
+
+<Tip>
+**Standardize Comments**: Develop a consistent format for quality notes so everyone can quickly find key information like COA numbers and approval status.
+</Tip>
+
+<Tip>
+**Use Table View for Review**: At end of day, switch to table view and filter by today's date to ensure you haven't missed any deliveries.
+</Tip>
+
+<Tip>
+**Document Everything**: Even if validation passes without issues, add a brief comment. This creates a complete audit trail.
+</Tip>
+
+<Tip>
+**Mobile Access**: You can check upcoming deliveries on your phone while in the lab. Just navigate to the calendar view.
+</Tip>
+
+<Tip>
+**Learn the Colors**: Memorize status colors so you can scan the calendar quickly without reading each entry.
+</Tip>
+
+<Tip>
+**Set Up Filters Once**: Your browser may remember your filter settings. Set up "Destination: Laboratorio" and you won't have to do it every time.
+</Tip>
+
+## Viewing Catalog Data
+
+You have read-only access to catalogs at `/dashboard/catalogos`:
+
+### Why View Catalogs?
+
+- **Verify product specifications** during validation
+- **Check supplier names** to match delivery documentation
+- **Review destination codes** for routing
+- **Understand presentation types** for packaging validation
+
+<Note>
+You cannot edit catalog entries. If you notice an error (wrong product name, outdated supplier), notify your Coordinator or Administrator.
+</Note>
+
+## Troubleshooting Common Issues
+
+<Accordion title="Cannot Find a Requisition">
+  **Issue**: Expected delivery arrived but can't find it in the system.
+  
+  **Solution**:
+  1. Check if you have filters applied - clear all filters
+  2. Search by PO number (Folio OC) in table view search box
+  3. Check if it's scheduled for a different date
+  4. Contact Coordinator - they may not have created the requisition yet
+</Accordion>
+
+<Accordion title="Cannot Edit a Requisition">
+  **Issue**: Edit button is missing or grayed out.
+  
+  **Solution**:
+  1. Confirm you're logged in (check if your name appears in header)
+  2. Verify your role is "Laboratorio" not "Consulta" (Consulta is view-only)
+  3. Try refreshing the page
+  4. If issue persists, contact Administrator
+</Accordion>
+
+<Accordion title="Changes Not Saving">
+  **Issue**: You edit a requisition but changes don't save.
+  
+  **Solution**:
+  1. Check for validation errors (required fields missing)
+  2. Ensure you clicked "Guardar Cambios" button
+  3. Check your internet connection
+  4. Try logging out and back in
+</Accordion>
+
+<Accordion title="Fecha Confirmada Field is Locked">
+  **Issue**: Cannot edit the "Fecha Confirmada" field.
+  
+  **Solution**: This is expected. Only Administrators and Coordinators can edit confirmed delivery dates. If the date is wrong, contact your Coordinator to update it.
+</Accordion>
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="CEDIS Guide" icon="warehouse" href="/guides/cedis-guide">
+    Understand receiving procedures
+  </Card>
+  <Card title="Coordinator Guide" icon="calendar-check" href="/guides/coordinator-guide">
+    Learn how requisitions are created and managed
+  </Card>
+  <Card title="Admin Guide" icon="shield" href="/guides/admin-guide">
+    System administration and catalog management
+  </Card>
+  <Card title="Calendar Features" icon="calendar" href="/features/calendar">
+    Deep dive into calendar functionality
+  </Card>
+</CardGroup>

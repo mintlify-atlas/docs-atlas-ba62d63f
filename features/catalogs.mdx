@@ -1,0 +1,525 @@
+---
+title: "Catalog Management"
+description: "Master data management for suppliers, products, presentations, destinations, units, and status values in the Cloro de Hidalgo system"
+---
+
+## Overview
+
+Catalogs are the foundation of data standardization in the procurement system. They define reusable master data that ensures consistency across all requisitions.
+
+<Info>
+Only users with **admin** or **coordinadora** roles can create and modify catalog entries. All users can view active catalog items.
+</Info>
+
+## Catalog Types
+
+The system maintains six primary catalog types:
+
+<CardGroup cols={2}>
+  <Card title="Proveedores (Suppliers)" icon="factory">
+    Companies that supply materials and products
+  </Card>
+  <Card title="Productos (Products)" icon="box">
+    Raw materials and supplies being procured
+  </Card>
+  <Card title="Presentaciones (Presentations)" icon="layers">
+    Packaging types (bags, drums, tanks, etc.)
+  </Card>
+  <Card title="Destinos (Destinations)" icon="map-pin">
+    Delivery locations and warehouses
+  </Card>
+  <Card title="Estatus (Status)" icon="clipboard-list">
+    Order lifecycle states with color coding
+  </Card>
+  <Card title="Unidades (Units)" icon="scale">
+    Units of measure (kg, L, pcs, etc.)
+  </Card>
+</CardGroup>
+
+## Data Structures
+
+### Common Fields
+
+All catalog types share these base fields:
+
+```typescript types/index.ts
+interface BaseCatalog {
+    id: string              // UUID primary key
+    nombre: string          // Name/label
+    activo: boolean         // Active status flag
+    created_at: string      // Creation timestamp
+}
+```
+
+### Proveedores (Suppliers)
+
+```typescript types/index.ts
+export interface Proveedor {
+    id: string
+    nombre: string
+    activo: boolean
+    created_at: string
+}
+```
+
+**Example values**: "Química Industrial", "Suministros del Norte", "Distribuidora ACME"
+
+### Productos (Products)
+
+```typescript types/index.ts
+export interface Producto {
+    id: string
+    nombre: string
+    descripcion: string | null
+    activo: boolean
+    created_at: string
+}
+```
+
+**Additional field**: `descripcion` - Optional detailed product description
+
+**Example values**: "Cloro líquido", "Hipoclorito de sodio", "Ácido muriático"
+
+### Presentaciones (Presentations)
+
+```typescript types/index.ts
+export interface Presentacion {
+    id: string
+    nombre: string
+    activo: boolean
+    created_at: string
+}
+```
+
+**Example values**: "Tambor 200L", "Bolsa 25kg", "Granel", "Garrafón 20L"
+
+### Destinos (Destinations)
+
+```typescript types/index.ts
+export interface Destino {
+    id: string
+    nombre: string
+    activo: boolean
+    created_at: string
+}
+```
+
+**Example values**: "Planta Hidalgo", "Almacén CEDIS", "Laboratorio Central"
+
+### Estatus (Status)
+
+```typescript types/index.ts
+export interface Estatus {
+    id: string
+    nombre: string
+    color_hex: string       // HEX color for visual coding
+    activo: boolean
+    created_at: string
+}
+```
+
+**Additional field**: `color_hex` - Hex color code (e.g., `#10b981`)
+
+**Example values**:
+- Pendiente (`#f59e0b` - amber)
+- Confirmado (`#10b981` - green)
+- En Tránsito (`#3b82f6` - blue)
+- Recibido (`#6b7280` - gray)
+
+### Unidades (Units)
+
+```typescript types/index.ts
+export interface Unidad {
+    id: string
+    nombre: string
+    abreviatura: string     // Short abbreviation
+    activo: boolean
+    created_at: string
+}
+```
+
+**Additional field**: `abreviatura` - Short form for display in tables
+
+**Example values**:
+- Kilogramo → `kg`
+- Litro → `L`
+- Pieza → `pza`
+- Metro cúbico → `m³`
+
+## CRUD Operations
+
+### Creating Catalog Entries
+
+The universal create action handles all catalog types:
+
+```typescript lib/actions/catalogos.ts
+export async function createCatalogEntry(table: string, data: any) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (!profile || !['admin', 'coordinadora'].includes(profile.rol)) {
+        return { error: 'No tienes permisos para modificar catálogos' }
+    }
+
+    const { data: result, error } = await supabase
+        .from(table)
+        .insert({
+            ...data,
+            activo: true  // New entries are active by default
+        })
+        .select()
+        .single()
+
+    if (error) return { error: error.message }
+
+    // Revalidate pages that use these catalogs
+    revalidatePath('/dashboard/catalogos')
+    revalidatePath('/dashboard/requisiciones')
+    revalidatePath('/dashboard/requisiciones/nueva')
+
+    return { data: result }
+}
+```
+
+<Note>
+All new catalog entries are created with `activo: true` by default. Users can deactivate them later if needed.
+</Note>
+
+### Updating Catalog Entries
+
+```typescript lib/actions/catalogos.ts
+export async function updateCatalogEntry(table: string, id: string, data: any) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (!profile || !['admin', 'coordinadora'].includes(profile.rol)) {
+        return { error: 'No tienes permisos para modificar catálogos' }
+    }
+
+    const { data: result, error } = await supabase
+        .from(table)
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/dashboard/catalogos')
+    return { data: result }
+}
+```
+
+### Toggling Active Status
+
+<Warning>
+Deactivating a catalog entry does NOT delete it. Inactive entries remain in the database and are still displayed in requisitions that reference them.
+</Warning>
+
+```typescript lib/actions/catalogos.ts
+export async function toggleCatalogStatus(table: string, id: string, active: boolean) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (!profile || !['admin', 'coordinadora'].includes(profile.rol)) {
+        return { error: 'No tienes permisos para modificar catálogos' }
+    }
+
+    const { error } = await supabase
+        .from(table)
+        .update({ activo: active })
+        .eq('id', id)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/dashboard/catalogos')
+    return { success: true }
+}
+```
+
+### Deleting Catalog Entries
+
+<Warning>
+Permanent deletion is restricted to **admin** role only and will fail if the entry is referenced by any requisitions.
+</Warning>
+
+```typescript lib/actions/catalogos.ts
+export async function deleteCatalogEntry(table: string, id: string) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (!profile || !['admin'].includes(profile.rol)) {
+        return { error: 'Solo los administradores pueden eliminar registros permanentemente' }
+    }
+
+    const { error } = await supabase
+        .from(table)
+        .delete()
+        .eq('id', id)
+
+    if (error) {
+        if (error.code === '23503') {  // Foreign key constraint violation
+            return { error: 'No se puede eliminar porque está siendo utilizado en requisiciones existentas. Intente desactivarlo en su lugar.' }
+        }
+        return { error: error.message }
+    }
+
+    revalidatePath('/dashboard/catalogos')
+    return { success: true }
+}
+```
+
+## Data Standardization Benefits
+
+<Steps>
+  <Step title="Consistent Naming">
+    All users select from the same supplier, product, and destination names, preventing typos and duplicates.
+  </Step>
+  
+  <Step title="Reporting Accuracy">
+    Standardized data enables accurate filtering and aggregation in reports.
+  </Step>
+  
+  <Step title="Data Integrity">
+    Foreign key constraints ensure requisitions always reference valid catalog entries.
+  </Step>
+  
+  <Step title="Easy Maintenance">
+    Update a supplier name once in the catalog, and it reflects across all requisitions.
+  </Step>
+</Steps>
+
+## Catalog UI
+
+The catalog management interface uses tabs for navigation:
+
+```typescript app/dashboard/catalogos/page.tsx
+<Tabs value={activeTab} onValueChange={setActiveTab}>
+    <TabsList>
+        <TabsTrigger value="proveedores">
+            <Factory className="h-4 w-4" /> Proveedores
+        </TabsTrigger>
+        <TabsTrigger value="productos">
+            <Package className="h-4 w-4" /> Productos
+        </TabsTrigger>
+        <TabsTrigger value="presentaciones">
+            <Layers className="h-4 w-4" /> Presentaciones
+        </TabsTrigger>
+        <TabsTrigger value="destinos">
+            <MapPin className="h-4 w-4" /> Destinos
+        </TabsTrigger>
+        <TabsTrigger value="estatus">
+            <ClipboardList className="h-4 w-4" /> Estatus
+        </TabsTrigger>
+        <TabsTrigger value="unidades">
+            <Scale className="h-4 w-4" /> Unidades
+        </TabsTrigger>
+    </TabsList>
+</Tabs>
+```
+
+### Table View
+
+Each catalog displays in a sortable table:
+
+```typescript app/dashboard/catalogos/page.tsx
+const renderList = (items: any[], columns: { key: string, label: string }[]) => {
+    const filteredItems = showInactive ? items : items.filter(item => item.activo)
+
+    return (
+        <table>
+            <thead>
+                <tr>
+                    {columns.map(col => <th key={col.key}>{col.label}</th>)}
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {filteredItems.map(item => (
+                    <tr key={item.id}>
+                        {columns.map(col => (
+                            <td key={col.key}>{item[col.key]}</td>
+                        ))}
+                        <td>
+                            <button onClick={() => handleToggleStatus(item.id, item.activo)}>
+                                {item.activo ? 'Activo' : 'Inactivo'}
+                            </button>
+                        </td>
+                        <td>
+                            <Button onClick={() => editItem(item)}>Edit</Button>
+                            <Button onClick={() => deleteItem(item)}>Delete</Button>
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    )
+}
+```
+
+### Show Inactive Toggle
+
+```typescript app/dashboard/catalogos/page.tsx
+const [showInactive, setShowInactive] = useState(false)
+
+<Switch
+    id="show-inactive"
+    checked={showInactive}
+    onCheckedChange={setShowInactive}
+/>
+
+const filteredItems = showInactive ? items : items.filter(item => item.activo)
+```
+
+<Tip>
+Use the "Ver Inactivos" toggle to view deactivated catalog entries. This is useful when you need to reactivate a previously used supplier or product.
+</Tip>
+
+## Quick Add from Requisition Form
+
+Users can create catalog entries without leaving the requisition form:
+
+```typescript components/forms/RequisicionForm.tsx
+<Select value={form.watch('proveedor_id')} onValueChange={(val) => form.setValue('proveedor_id', val)}>
+    <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+    <SelectContent>
+        {catalogos.proveedores
+            .filter(p => p.activo || p.id === form.getValues('proveedor_id'))
+            .map(p => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}
+    </SelectContent>
+</Select>
+<Button
+    variant="outline"
+    onClick={() => setQuickAdd({ 
+        open: true, 
+        title: 'Proveedor', 
+        table: 'proveedores', 
+        field: 'proveedor_id' 
+    })}
+>
+    <Plus className="h-3 w-3" />
+</Button>
+
+<QuickAddModal
+    open={quickAdd.open}
+    title={quickAdd.title}
+    table={quickAdd.table}
+    onSuccess={(newItem) => {
+        refresh()  // Reload catalogs
+        form.setValue(quickAdd.field, newItem.id)  // Auto-select new entry
+        setQuickAdd(null)
+    }}
+/>
+```
+
+<Steps>
+  <Step title="Click Quick Add Button">
+    The "+" button next to any catalog dropdown opens the quick add modal.
+  </Step>
+  
+  <Step title="Enter New Value">
+    Type the new supplier, product, or other catalog entry name.
+  </Step>
+  
+  <Step title="Auto-Select">
+    The newly created entry is automatically selected in the requisition form.
+  </Step>
+</Steps>
+
+## Database Schema
+
+Catalog tables have foreign key relationships with requisiciones:
+
+```sql supabase/schema.sql
+CREATE TABLE proveedores (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nombre      TEXT NOT NULL,
+  activo      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE requisiciones (
+  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  proveedor_id         UUID NOT NULL REFERENCES proveedores(id),
+  producto_id          UUID NOT NULL REFERENCES productos(id),
+  presentacion_id      UUID NOT NULL REFERENCES presentaciones(id),
+  destino_id           UUID NOT NULL REFERENCES destinos(id),
+  estatus_id           UUID NOT NULL REFERENCES estatus(id),
+  unidad_cantidad_id   UUID NOT NULL REFERENCES unidades(id),
+  -- ... other fields
+);
+```
+
+<Warning>
+Foreign key constraints prevent deletion of catalog entries that are referenced by requisitions. Attempting to delete such entries returns error code `23503`.
+</Warning>
+
+## Loading Catalogs
+
+Catalogs are loaded in parallel for optimal performance:
+
+```typescript lib/actions/requisiciones.ts
+export async function getCatalogos() {
+    const supabase = await createClient()
+
+    const [proveedores, productos, presentaciones, destinos, estatus, unidades] =
+        await Promise.all([
+            supabase.from('proveedores').select('*').order('nombre'),
+            supabase.from('productos').select('*').order('nombre'),
+            supabase.from('presentaciones').select('*').order('nombre'),
+            supabase.from('destinos').select('*').order('nombre'),
+            supabase.from('estatus').select('*').order('nombre'),
+            supabase.from('unidades').select('*').order('nombre'),
+        ])
+
+    return {
+        proveedores: proveedores.data ?? [],
+        productos: productos.data ?? [],
+        presentaciones: presentaciones.data ?? [],
+        destinos: destinos.data ?? [],
+        estatus: estatus.data ?? [],
+        unidades: unidades.data ?? [],
+    }
+}
+```
+
+<Tip>
+Using `Promise.all` loads all six catalog types simultaneously, reducing total load time compared to sequential queries.
+</Tip>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Descriptive Names">
+    Name catalog entries clearly and consistently. For example: "Planta Hidalgo" instead of "PH" or "Hidalgo".
+  </Accordion>
+
+  <Accordion title="Deactivate Instead of Delete">
+    When a supplier or product is no longer used, deactivate it rather than deleting. This preserves historical requisition data.
+  </Accordion>
+
+  <Accordion title="Standardize Status Colors">
+    Use consistent colors across your organization:
+    - Pending/Waiting: Amber/Orange
+    - Confirmed/Success: Green
+    - In Transit: Blue
+    - Completed: Gray
+    - Cancelled/Error: Red
+  </Accordion>
+
+  <Accordion title="Use Standard Abbreviations">
+    For units, use internationally recognized abbreviations (kg, L, m³) for clarity.
+  </Accordion>
+</AccordionGroup>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Requisition Management" icon="file-text" href="/features/requisitions">
+    How requisitions reference catalog data
+  </Card>
+  <Card title="Status Tracking" icon="list-check" href="/features/status-tracking">
+    Understanding status catalog and workflow
+  </Card>
+</CardGroup>

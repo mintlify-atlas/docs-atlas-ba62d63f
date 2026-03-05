@@ -1,0 +1,487 @@
+---
+title: Deployment
+description: Deploy the Cloro de Hidalgo Procurement System to production
+---
+
+## Overview
+
+The Cloro de Hidalgo Procurement System is optimized for deployment on Vercel, but can be deployed to any platform that supports Next.js 16.
+
+## Prerequisites
+
+- Production Supabase project
+- Vercel account (or alternative platform)
+- GitHub repository with your code
+- Domain name (optional)
+
+## Deployment Options
+
+### Vercel (Recommended)
+
+Vercel is the recommended platform for Next.js applications:
+- Zero-configuration deployment
+- Automatic HTTPS
+- Global CDN
+- Edge middleware support
+- Preview deployments for branches
+
+### Alternative Platforms
+
+- **Docker**: Self-hosted with containers
+- **AWS Amplify**: AWS-managed hosting
+- **Netlify**: Alternative serverless platform
+- **Railway**: Container-based deployment
+- **DigitalOcean App Platform**: Managed hosting
+
+## Vercel Deployment
+
+<Steps>
+
+### Push Code to GitHub
+
+Ensure your code is in a GitHub repository:
+
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/yourusername/your-repo.git
+git push -u origin main
+```
+
+### Import Project to Vercel
+
+1. Go to [vercel.com](https://vercel.com) and sign in
+2. Click **Add New Project**
+3. Import your GitHub repository
+4. Select the repository (e.g., `App_Compras`)
+
+### Configure Build Settings
+
+Vercel auto-detects Next.js. Verify these settings:
+
+- **Framework Preset**: Next.js
+- **Build Command**: `npm run build` (or `yarn build`, `pnpm build`)
+- **Output Directory**: `.next`
+- **Install Command**: `npm install`
+
+### Add Environment Variables
+
+Click **Environment Variables** and add:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-production-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-production-anon-key
+```
+
+<Warning>
+Use your **production** Supabase credentials, not development ones.
+</Warning>
+
+**For each variable**:
+1. Enter **Key**: `NEXT_PUBLIC_SUPABASE_URL`
+2. Enter **Value**: Your production URL
+3. Select environments: **Production**, **Preview**, **Development**
+4. Click **Add**
+
+### Deploy
+
+Click **Deploy**. Vercel will:
+1. Clone your repository
+2. Install dependencies
+3. Run `npm run build`
+4. Deploy to global CDN
+5. Provide a production URL
+
+### Verify Deployment
+
+1. Open the provided URL (e.g., `your-app.vercel.app`)
+2. Test the login page
+3. Create a test account
+4. Verify database connection
+
+</Steps>
+
+## Production Supabase Setup
+
+<Steps>
+
+### Create Production Project
+
+1. Go to [supabase.com](https://supabase.com)
+2. Create a new project for production
+3. Choose a strong database password
+4. Select a region close to your users
+
+### Run Database Schema
+
+1. Open SQL Editor in production project
+2. Copy contents of `supabase/schema.sql`
+3. Execute the entire script
+4. Verify all tables and policies are created
+
+### Configure Authentication
+
+1. Go to **Authentication** → **URL Configuration**
+2. Set **Site URL** to your production domain:
+   - Vercel: `https://your-app.vercel.app`
+   - Custom domain: `https://yourdomain.com`
+3. Add **Redirect URLs**:
+   - `https://your-app.vercel.app/dashboard/calendar`
+   - `https://your-app.vercel.app/*` (wildcard)
+
+### Configure Email Templates (Optional)
+
+1. Go to **Authentication** → **Email Templates**
+2. Customize email templates:
+   - Confirmation email
+   - Password reset
+   - Magic link
+3. Update sender email and branding
+
+### Copy Production Credentials
+
+1. Go to **Settings** → **API**
+2. Copy:
+   - **Project URL**
+   - **Anon/Public Key**
+3. Add to Vercel environment variables
+
+</Steps>
+
+## Environment Variables in Production
+
+### Required Variables
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### Update Variables
+
+To update environment variables after deployment:
+
+1. Go to Vercel dashboard
+2. Select your project
+3. Go to **Settings** → **Environment Variables**
+4. Edit or add variables
+5. **Redeploy** for changes to take effect
+
+<Note>
+Vercel does not automatically redeploy when environment variables change. You must trigger a new deployment.
+</Note>
+
+## Custom Domain Setup
+
+<Steps>
+
+### Add Domain in Vercel
+
+1. Go to project **Settings** → **Domains**
+2. Click **Add Domain**
+3. Enter your domain (e.g., `procurement.clorohidalgo.com`)
+4. Click **Add**
+
+### Configure DNS
+
+Add DNS records at your domain registrar:
+
+**For root domain** (`clorohidalgo.com`):
+```
+Type: A
+Name: @
+Value: 76.76.21.21
+```
+
+**For subdomain** (`procurement.clorohidalgo.com`):
+```
+Type: CNAME
+Name: procurement
+Value: cname.vercel-dns.com
+```
+
+### Wait for Verification
+
+Vercel will:
+- Verify domain ownership
+- Provision SSL certificate (automatic)
+- Make site available at your domain
+
+### Update Supabase URLs
+
+Update redirect URLs in Supabase:
+1. Go to **Authentication** → **URL Configuration**
+2. Set **Site URL**: `https://procurement.clorohidalgo.com`
+3. Add to **Redirect URLs**:
+   - `https://procurement.clorohidalgo.com/*`
+
+</Steps>
+
+## Build Configuration
+
+### next.config.ts
+
+Production-ready configuration:
+
+```typescript
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // Production optimizations enabled by default
+};
+
+export default nextConfig;
+```
+
+### Package.json Scripts
+
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  }
+}
+```
+
+## Database Migration
+
+### Initial Setup
+
+1. Run `schema.sql` in production Supabase
+2. Verify all tables, policies, and seed data
+
+### Schema Updates
+
+For future schema changes:
+
+```sql
+-- Example: Add new column
+ALTER TABLE requisiciones 
+ADD COLUMN nueva_columna TEXT;
+
+-- Update RLS policies if needed
+CREATE POLICY "policy_name" ON table_name ...
+```
+
+Run migrations in Supabase SQL Editor.
+
+### Data Migration
+
+To migrate data from development to production:
+
+1. Export data from development:
+   ```sql
+   COPY (SELECT * FROM proveedores) TO '/tmp/proveedores.csv' CSV HEADER;
+   ```
+
+2. Import to production via Supabase dashboard:
+   - Go to **Table Editor**
+   - Select table
+   - Click **Import data from CSV**
+
+<Warning>
+Never migrate user passwords. Let users recreate accounts or use Supabase Auth API.
+</Warning>
+
+## Post-Deployment Checklist
+
+<Steps>
+
+### Verify Application
+
+- [ ] Login page loads
+- [ ] Can create account
+- [ ] Can sign in
+- [ ] Dashboard loads
+- [ ] Calendar displays
+- [ ] Can create requisition
+- [ ] Can edit requisition
+- [ ] Can delete requisition (admin)
+- [ ] Catalog pages work
+- [ ] Admin panel accessible (admin role)
+
+### Verify Database
+
+- [ ] RLS policies enabled
+- [ ] Seed data present
+- [ ] Indexes created
+- [ ] Triggers functioning
+- [ ] Audit trail working
+
+### Verify Security
+
+- [ ] HTTPS enabled (green lock icon)
+- [ ] Environment variables not exposed
+- [ ] `.env.local` not committed to Git
+- [ ] RLS blocking unauthorized access
+- [ ] Admin features restricted to admin role
+
+### Performance
+
+- [ ] Images optimized
+- [ ] Fonts loading correctly (Avenir Next)
+- [ ] Calendar renders quickly
+- [ ] Forms submit without lag
+- [ ] Lighthouse score > 90
+
+### Monitoring
+
+- [ ] Set up error tracking (optional: Sentry)
+- [ ] Monitor Vercel analytics
+- [ ] Check Supabase database metrics
+- [ ] Set up uptime monitoring (optional)
+
+</Steps>
+
+## Continuous Deployment
+
+Vercel automatically deploys:
+
+- **Production**: Commits to `main` branch
+- **Preview**: Commits to other branches
+- **Pull Requests**: Each PR gets a preview URL
+
+### Deployment Workflow
+
+```bash
+# Make changes
+git checkout -b feature/new-feature
+# ... code changes ...
+git add .
+git commit -m "Add new feature"
+git push origin feature/new-feature
+
+# Vercel creates preview deployment
+# Review preview URL
+
+# Merge to main
+git checkout main
+git merge feature/new-feature
+git push origin main
+
+# Vercel deploys to production automatically
+```
+
+## Rollback
+
+To rollback to a previous deployment:
+
+1. Go to Vercel dashboard
+2. Select your project
+3. Go to **Deployments**
+4. Find previous successful deployment
+5. Click **⋮** (three dots) → **Promote to Production**
+
+## Troubleshooting
+
+### Build Failures
+
+**Error**: `Module not found`
+
+**Solution**: Verify dependencies in `package.json`:
+```bash
+npm install
+npm run build  # Test locally
+```
+
+**Error**: `Type errors`
+
+**Solution**: Fix TypeScript errors:
+```bash
+npm run lint
+npx tsc --noEmit
+```
+
+### Database Connection Issues
+
+**Error**: `Invalid API key`
+
+**Solution**: 
+1. Verify environment variables in Vercel
+2. Check Supabase credentials match
+3. Redeploy after updating variables
+
+**Error**: `RLS policy violation`
+
+**Solution**:
+1. Check RLS policies in Supabase
+2. Verify user has correct role
+3. Test queries in Supabase SQL Editor
+
+### Authentication Issues
+
+**Error**: `Redirect URL not allowed`
+
+**Solution**:
+1. Add production URL to Supabase redirect URLs
+2. Include wildcard: `https://yourdomain.com/*`
+3. Check Site URL matches production domain
+
+## Monitoring and Logs
+
+### Vercel Logs
+
+View runtime logs:
+1. Go to project dashboard
+2. Click **Deployments**
+3. Select deployment
+4. Click **Function Logs**
+
+### Supabase Logs
+
+View database logs:
+1. Go to Supabase dashboard
+2. Click **Logs**
+3. Select log type:
+   - **Postgres Logs**: Database queries
+   - **API Logs**: Supabase API calls
+   - **Auth Logs**: Authentication events
+
+## Performance Optimization
+
+### Image Optimization
+
+Next.js automatically optimizes images:
+
+```tsx
+import Image from 'next/image'
+
+<Image
+    src="/logo.png"
+    alt="Logo"
+    width={200}
+    height={100}
+    priority
+/>
+```
+
+### Font Optimization
+
+Fonts are already optimized in `app/globals.css`:
+
+```css
+@font-face {
+  font-family: 'AvenirNext';
+  src: url('/fonts/AvenirNextLTPro-Regular.otf') format('opentype');
+  font-display: swap;
+}
+```
+
+### Code Splitting
+
+Next.js automatically code-splits by route. No additional configuration needed.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Customization" icon="palette" href="/development/customization">
+    Customize themes and extend functionality
+  </Card>
+  <Card title="Server Actions" icon="server" href="/development/server-actions">
+    Learn about data operations
+  </Card>
+</CardGroup>

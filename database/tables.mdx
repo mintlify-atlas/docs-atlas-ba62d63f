@@ -1,0 +1,614 @@
+---
+title: 'Database Tables'
+description: 'Complete reference for all tables in the procurement system'
+---
+
+## Overview
+
+The database consists of **9 tables** organized into three categories:
+
+- **6 Catalog Tables**: Reference data (proveedores, productos, presentaciones, destinos, estatus, unidades)
+- **2 Core Tables**: Main application data (profiles, requisiciones)
+- **1 Audit Table**: Change tracking (requisiciones_historial)
+
+---
+
+## Core Tables
+
+<Accordion title="profiles - User Profile Extension">
+  
+Extends Supabase Auth users with application-specific metadata.
+
+### Purpose
+
+- Store user full names and roles
+- Link application permissions to authenticated users
+- Auto-created on user signup via trigger
+
+### Schema
+
+```sql
+CREATE TABLE profiles (
+  id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  nombre_completo TEXT,
+  rol             user_role NOT NULL DEFAULT 'consulta',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Columns
+
+<ResponseField name="id" type="UUID" required>
+  Primary key, references `auth.users(id)`. Cascades on delete.
+</ResponseField>
+
+<ResponseField name="nombre_completo" type="TEXT">
+  User's full name for display purposes. Defaults to email if not provided during signup.
+</ResponseField>
+
+<ResponseField name="rol" type="user_role" required default="consulta">
+  User's role in the system. Enum: `admin`, `coordinadora`, `consulta`.
+</ResponseField>
+
+<ResponseField name="created_at" type="TIMESTAMPTZ" required>
+  Timestamp when profile was created. Auto-generated.
+</ResponseField>
+
+<ResponseField name="updated_at" type="TIMESTAMPTZ" required>
+  Timestamp of last profile update. Auto-generated.
+</ResponseField>
+
+### Triggers
+
+**Auto-create on signup:**
+
+```sql
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+```
+
+The `handle_new_user()` function automatically creates a profile record when a new user signs up, extracting metadata from `raw_user_meta_data`.
+
+### Access Control
+
+- Users can view and update their own profile
+- Admins can view and manage all profiles
+- See [Row Level Security](/database/row-level-security#profiles) for policy details
+
+</Accordion>
+
+<Accordion title="requisiciones - Purchase Requisitions">
+
+Main table storing all purchase requisition records.
+
+### Purpose
+
+- Track product orders from suppliers
+- Manage requisition status and fulfillment
+- Link products, quantities, destinations, and statuses
+
+### Schema
+
+```sql
+CREATE TABLE requisiciones (
+  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  fecha_recepcion      DATE NOT NULL,
+  proveedor_id         UUID NOT NULL REFERENCES proveedores(id),
+  producto_id          UUID NOT NULL REFERENCES productos(id),
+  presentacion_id      UUID NOT NULL REFERENCES presentaciones(id),
+  destino_id           UUID NOT NULL REFERENCES destinos(id),
+  estatus_id           UUID NOT NULL REFERENCES estatus(id),
+  cantidad_solicitada  NUMERIC(10, 2) NOT NULL CHECK (cantidad_solicitada > 0),
+  unidad_cantidad_id   UUID NOT NULL REFERENCES unidades(id),
+  numero_oc            TEXT,
+  comentarios          TEXT,
+  created_by           UUID NOT NULL REFERENCES auth.users(id),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Columns
+
+<ResponseField name="id" type="UUID" required>
+  Primary key. Auto-generated UUID.
+</ResponseField>
+
+<ResponseField name="fecha_recepcion" type="DATE" required>
+  Expected or actual delivery date for the requisition.
+</ResponseField>
+
+<ResponseField name="proveedor_id" type="UUID" required>
+  Foreign key to `proveedores`. The supplier providing the product.
+</ResponseField>
+
+<ResponseField name="producto_id" type="UUID" required>
+  Foreign key to `productos`. The product being ordered.
+</ResponseField>
+
+<ResponseField name="presentacion_id" type="UUID" required>
+  Foreign key to `presentaciones`. How the product is packaged (e.g., drum, bag, bulk).
+</ResponseField>
+
+<ResponseField name="destino_id" type="UUID" required>
+  Foreign key to `destinos`. Delivery destination (warehouse, production line).
+</ResponseField>
+
+<ResponseField name="estatus_id" type="UUID" required>
+  Foreign key to `estatus`. Current status of the requisition.
+</ResponseField>
+
+<ResponseField name="cantidad_solicitada" type="NUMERIC(10,2)" required>
+  Quantity ordered. Must be greater than 0. Precision: 10 digits, 2 decimal places.
+</ResponseField>
+
+<ResponseField name="unidad_cantidad_id" type="UUID" required>
+  Foreign key to `unidades`. Measurement unit for the quantity (kg, L, pzs, etc.).
+</ResponseField>
+
+<ResponseField name="numero_oc" type="TEXT">
+  Purchase order number. Optional reference to external procurement system.
+</ResponseField>
+
+<ResponseField name="comentarios" type="TEXT">
+  Additional notes or comments about the requisition.
+</ResponseField>
+
+<ResponseField name="created_by" type="UUID" required>
+  Foreign key to `auth.users`. User who created the requisition.
+</ResponseField>
+
+<ResponseField name="created_at" type="TIMESTAMPTZ" required>
+  Timestamp when requisition was created. Auto-generated.
+</ResponseField>
+
+<ResponseField name="updated_at" type="TIMESTAMPTZ" required>
+  Timestamp of last update. Auto-updated via trigger.
+</ResponseField>
+
+### Indexes
+
+```sql
+CREATE INDEX idx_requisiciones_fecha ON requisiciones(fecha_recepcion);
+CREATE INDEX idx_requisiciones_proveedor ON requisiciones(proveedor_id);
+CREATE INDEX idx_requisiciones_estatus ON requisiciones(estatus_id);
+CREATE INDEX idx_requisiciones_destino ON requisiciones(destino_id);
+```
+
+Optimizes queries filtering by date, supplier, status, or destination.
+
+### Constraints
+
+- `cantidad_solicitada` must be greater than 0
+- All foreign keys enforce referential integrity
+
+### Triggers
+
+**Auto-update timestamp:**
+
+```sql
+CREATE TRIGGER trg_requisiciones_updated_at
+  BEFORE UPDATE ON requisiciones
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+```
+
+### Access Control
+
+- All authenticated users can view requisitions
+- Only `admin` and `coordinadora` can insert, update
+- Only `admin` can delete
+- See [Row Level Security](/database/row-level-security#requisiciones) for policy details
+
+</Accordion>
+
+<Accordion title="requisiciones_historial - Audit Log">
+
+Tracks all changes made to requisitions for compliance and auditing.
+
+### Purpose
+
+- Record every field modification
+- Track who made changes and when
+- Provide audit trail for compliance
+
+### Schema
+
+```sql
+CREATE TABLE requisiciones_historial (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  requisicion_id    UUID NOT NULL REFERENCES requisiciones(id) ON DELETE CASCADE,
+  campo_modificado  TEXT NOT NULL,
+  valor_anterior    TEXT,
+  valor_nuevo       TEXT,
+  usuario_id        UUID NOT NULL REFERENCES auth.users(id),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Columns
+
+<ResponseField name="id" type="UUID" required>
+  Primary key. Auto-generated UUID.
+</ResponseField>
+
+<ResponseField name="requisicion_id" type="UUID" required>
+  Foreign key to `requisiciones`. Links to the modified requisition. Cascades on delete.
+</ResponseField>
+
+<ResponseField name="campo_modificado" type="TEXT" required>
+  Name of the field that was changed (e.g., "estatus_id", "cantidad_solicitada").
+</ResponseField>
+
+<ResponseField name="valor_anterior" type="TEXT">
+  Previous value before the change. Stored as text for flexibility.
+</ResponseField>
+
+<ResponseField name="valor_nuevo" type="TEXT">
+  New value after the change. Stored as text for flexibility.
+</ResponseField>
+
+<ResponseField name="usuario_id" type="UUID" required>
+  Foreign key to `auth.users`. User who made the modification.
+</ResponseField>
+
+<ResponseField name="created_at" type="TIMESTAMPTZ" required>
+  Timestamp when change was recorded. Auto-generated.
+</ResponseField>
+
+### Indexes
+
+```sql
+CREATE INDEX idx_historial_requisicion ON requisiciones_historial(requisicion_id);
+```
+
+Optimizes queries retrieving change history for a specific requisition.
+
+### Access Control
+
+- Only `admin` and `coordinadora` can view history
+- Only `admin` and `coordinadora` can insert (system-triggered)
+- See [Row Level Security](/database/row-level-security#requisiciones_historial) for policy details
+
+</Accordion>
+
+---
+
+## Catalog Tables
+
+All catalog tables share a common structure:
+- UUID primary key
+- `nombre` (name) field
+- `activo` (active) boolean for soft deletes
+- `created_at` timestamp
+
+<Accordion title="proveedores - Suppliers">
+
+Stores supplier/vendor information.
+
+### Schema
+
+```sql
+CREATE TABLE proveedores (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nombre      TEXT NOT NULL,
+  activo      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Columns
+
+<ResponseField name="id" type="UUID" required>
+  Primary key. Auto-generated UUID.
+</ResponseField>
+
+<ResponseField name="nombre" type="TEXT" required>
+  Supplier name (e.g., "Proveedora Química Nacional").
+</ResponseField>
+
+<ResponseField name="activo" type="BOOLEAN" required default="true">
+  Whether supplier is active. False = soft deleted.
+</ResponseField>
+
+<ResponseField name="created_at" type="TIMESTAMPTZ" required>
+  Timestamp when supplier was created.
+</ResponseField>
+
+### Seed Data
+
+Includes 5 sample suppliers:
+- Proveedora Química Nacional
+- Distribuidora del Centro
+- Importadora Técnica
+- Soluciones Industriales SA
+- Comercial de Insumos
+
+</Accordion>
+
+<Accordion title="productos - Products">
+
+Stores product catalog with descriptions.
+
+### Schema
+
+```sql
+CREATE TABLE productos (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nombre       TEXT NOT NULL,
+  descripcion  TEXT,
+  activo       BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Columns
+
+<ResponseField name="id" type="UUID" required>
+  Primary key. Auto-generated UUID.
+</ResponseField>
+
+<ResponseField name="nombre" type="TEXT" required>
+  Product name (e.g., "Sosa Cáustica").
+</ResponseField>
+
+<ResponseField name="descripcion" type="TEXT">
+  Detailed product description (e.g., "Hidróxido de sodio en escamas").
+</ResponseField>
+
+<ResponseField name="activo" type="BOOLEAN" required default="true">
+  Whether product is active. False = soft deleted.
+</ResponseField>
+
+<ResponseField name="created_at" type="TIMESTAMPTZ" required>
+  Timestamp when product was created.
+</ResponseField>
+
+### Seed Data
+
+Includes 8 chemical products:
+- Sosa Cáustica (Sodium hydroxide)
+- LABSA (Linear alkylbenzene sulfonic acid)
+- Texapon (Sodium laureth sulfate)
+- Colorante Azul (Blue dye)
+- Fragancia Lavanda (Lavender fragrance)
+- Cloruro de Sodio (Sodium chloride)
+- Glucamato (Natural surfactant)
+- Alcohol Cetílico (Cetyl alcohol)
+
+</Accordion>
+
+<Accordion title="presentaciones - Product Presentations">
+
+Defines packaging types for products.
+
+### Schema
+
+```sql
+CREATE TABLE presentaciones (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nombre      TEXT NOT NULL,
+  activo      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Columns
+
+<ResponseField name="id" type="UUID" required>
+  Primary key. Auto-generated UUID.
+</ResponseField>
+
+<ResponseField name="nombre" type="TEXT" required>
+  Presentation name (e.g., "Tambor 200 L", "Granel").
+</ResponseField>
+
+<ResponseField name="activo" type="BOOLEAN" required default="true">
+  Whether presentation is active. False = soft deleted.
+</ResponseField>
+
+<ResponseField name="created_at" type="TIMESTAMPTZ" required>
+  Timestamp when presentation was created.
+</ResponseField>
+
+### Seed Data
+
+Includes 8 presentation types:
+- Granel (Bulk)
+- Tambor 200 L (200L drum)
+- Cuñete 20 L (20L pail)
+- Garrafón 19 L (19L jug)
+- Saco 25 kg (25kg bag)
+- Bolsa 1 kg (1kg bag)
+- Caja 12 pzas (12-piece box)
+- Pallet
+
+</Accordion>
+
+<Accordion title="destinos - Delivery Destinations">
+
+Defines delivery locations within facilities.
+
+### Schema
+
+```sql
+CREATE TABLE destinos (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nombre      TEXT NOT NULL,
+  activo      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Columns
+
+<ResponseField name="id" type="UUID" required>
+  Primary key. Auto-generated UUID.
+</ResponseField>
+
+<ResponseField name="nombre" type="TEXT" required>
+  Destination name (e.g., "Almacén General", "Línea de Producción 1").
+</ResponseField>
+
+<ResponseField name="activo" type="BOOLEAN" required default="true">
+  Whether destination is active. False = soft deleted.
+</ResponseField>
+
+<ResponseField name="created_at" type="TIMESTAMPTZ" required>
+  Timestamp when destination was created.
+</ResponseField>
+
+### Seed Data
+
+Includes 7 locations:
+- Almacén General (General warehouse)
+- Línea de Producción 1 (Production line 1)
+- Línea de Producción 2 (Production line 2)
+- Laboratorio de Calidad (Quality lab)
+- Almacén Materia Prima (Raw materials warehouse)
+- Planta Amozoc (Amozoc plant)
+- Planta Apizaco (Apizaco plant)
+
+</Accordion>
+
+<Accordion title="estatus - Requisition Statuses">
+
+Defines possible requisition statuses with color coding.
+
+### Schema
+
+```sql
+CREATE TABLE estatus (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nombre      TEXT NOT NULL,
+  color_hex   TEXT NOT NULL DEFAULT '#6366F1',
+  activo      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Columns
+
+<ResponseField name="id" type="UUID" required>
+  Primary key. Auto-generated UUID.
+</ResponseField>
+
+<ResponseField name="nombre" type="TEXT" required>
+  Status name (e.g., "Pendiente", "Confirmado").
+</ResponseField>
+
+<ResponseField name="color_hex" type="TEXT" required default="#6366F1">
+  Hex color code for UI display (e.g., "#F59E0B" for orange).
+</ResponseField>
+
+<ResponseField name="activo" type="BOOLEAN" required default="true">
+  Whether status is active. False = soft deleted.
+</ResponseField>
+
+<ResponseField name="created_at" type="TIMESTAMPTZ" required>
+  Timestamp when status was created.
+</ResponseField>
+
+### Seed Data
+
+Includes 6 statuses with colors:
+- Pendiente (#F59E0B - amber)
+- Confirmado (#3B82F6 - blue)
+- En Tránsito (#8B5CF6 - purple)
+- Recibido (#10B981 - green)
+- Cancelado (#EF4444 - red)
+- En Revisión (#F97316 - orange)
+
+</Accordion>
+
+<Accordion title="unidades - Measurement Units">
+
+Defines units of measurement for quantities.
+
+### Schema
+
+```sql
+CREATE TABLE unidades (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  nombre       TEXT NOT NULL,
+  abreviatura  TEXT NOT NULL,
+  activo       BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+### Columns
+
+<ResponseField name="id" type="UUID" required>
+  Primary key. Auto-generated UUID.
+</ResponseField>
+
+<ResponseField name="nombre" type="TEXT" required>
+  Full unit name (e.g., "Kilogramos", "Litros").
+</ResponseField>
+
+<ResponseField name="abreviatura" type="TEXT" required>
+  Abbreviated form for display (e.g., "kg", "L").
+</ResponseField>
+
+<ResponseField name="activo" type="BOOLEAN" required default="true">
+  Whether unit is active. False = soft deleted.
+</ResponseField>
+
+<ResponseField name="created_at" type="TIMESTAMPTZ" required>
+  Timestamp when unit was created.
+</ResponseField>
+
+### Seed Data
+
+Includes 8 common units:
+- Kilogramos (kg)
+- Litros (L)
+- Piezas (pzs)
+- Toneladas (ton)
+- Cajas (caj)
+- Sacos (sac)
+- Tambos (tam)
+- Gramos (g)
+
+</Accordion>
+
+---
+
+## Catalog Table Access Control
+
+All 6 catalog tables share identical RLS policies:
+
+```sql
+-- All authenticated users can read
+CREATE POLICY "[table]: all authenticated can select" ON [table]
+  FOR SELECT TO authenticated USING (TRUE);
+
+-- Only admins can insert, update, delete
+CREATE POLICY "[table]: admin full access" ON [table]
+  FOR ALL TO authenticated 
+  USING (get_my_role() = 'admin')
+  WITH CHECK (get_my_role() = 'admin');
+```
+
+This ensures:
+- Anyone logged in can view catalog data
+- Only admins can modify catalogs
+- Data consistency across the application
+
+---
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Relationships" icon="diagram-project" href="/database/relationships">
+    See how tables connect via foreign keys
+  </Card>
+  <Card title="RLS Policies" icon="shield-halved" href="/database/row-level-security">
+    Learn about access control policies
+  </Card>
+  <Card title="User Roles" icon="users" href="/database/roles">
+    Understand role-based permissions
+  </Card>
+</CardGroup>

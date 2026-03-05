@@ -1,97 +1,103 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Welcome to Cloro de Hidalgo Procurement System"
+description: "Enterprise procurement management system for tracking purchase requisitions, supplier deliveries, and raw material inventory"
 ---
 
-## Setting up
+<img
+  className="block"
+  src="https://media.brand.dev/de5d2af7-3a5c-4160-a84d-916bb35233cf.png"
+  alt="Cloro de Hidalgo Logo"
+  style={{ maxWidth: '300px', margin: '0 auto 2rem' }}
+/>
 
-Get your documentation site up and running in minutes.
+## About the System
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+The Cloro de Hidalgo Procurement System is a comprehensive enterprise solution designed to optimize the supply chain workflow for raw materials and supplies. Built with Next.js and Supabase, it enables seamless communication between Purchasing, Laboratory, CEDIS departments, and external suppliers.
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Get Started" icon="rocket" href="/quickstart">
+    Set up your account and create your first requisition
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Authentication" icon="shield" href="/authentication">
+    Learn about role-based access and security
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="User Guides" icon="book" href="/guides/admin-guide">
+    Role-specific guides for all user types
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Features" icon="sparkles" href="/features/requisitions">
+    Explore all system capabilities
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Key Features
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Requisition Management" icon="clipboard-list" href="/features/requisitions">
+    Full lifecycle tracking from request to delivery
+  </Card>
+  <Card title="Calendar View" icon="calendar" href="/features/calendar">
+    Visual scheduling and delivery coordination
+  </Card>
+  <Card title="Master Catalogs" icon="database" href="/features/catalogs">
+    Centralized supplier, product, and destination management
+  </Card>
+  <Card title="Status Tracking" icon="traffic-light" href="/features/status-tracking">
+    Real-time status updates with color-coded visual indicators
+  </Card>
+  <Card title="Audit History" icon="clock-rotate-left" href="/features/audit-history">
+    Complete change tracking and accountability
+  </Card>
+  <Card title="Role-Based Access" icon="users" href="/database/roles">
+    Secure multi-role authentication system
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## User Roles
 
-## Need inspiration?
+The system supports multiple user roles with specific permissions:
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<AccordionGroup>
+  <Accordion title="Admin" icon="user-shield">
+    Full system access including user management, catalog administration, and system configuration
+  </Accordion>
+  <Accordion title="Coordinator" icon="user-tie">
+    Manage requisitions, communicate with suppliers, and coordinate deliveries
+  </Accordion>
+  <Accordion title="Laboratory" icon="flask">
+    Technical validation and quality control monitoring
+  </Accordion>
+  <Accordion title="CEDIS" icon="warehouse">
+    Receive deliveries and confirm inventory receipts
+  </Accordion>
+</AccordionGroup>
+
+## Technology Stack
+
+<CardGroup cols={3}>
+  <Card title="Next.js 16" icon="react">
+    Modern React framework with Server Actions
+  </Card>
+  <Card title="Supabase" icon="database">
+    PostgreSQL database with real-time sync
+  </Card>
+  <Card title="Tailwind CSS" icon="paintbrush">
+    Modern styling framework
+  </Card>
+</CardGroup>
+
+## Quick Links
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/development/installation">
+    Set up the development environment
+  </Card>
+  <Card title="Database Schema" icon="table" href="/database/overview">
+    Explore the complete data model
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/development/deployment">
+    Deploy to production
+  </Card>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/CalidadYDesarrolloGinez/App_Compras">
+    View source code
+  </Card>
+</CardGroup>

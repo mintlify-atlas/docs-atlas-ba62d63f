@@ -1,0 +1,724 @@
+---
+title: 'User Roles'
+description: 'Role-based access control and permissions system'
+---
+
+## Overview
+
+The Cloro de Hidalgo Procurement System implements a **three-tier role hierarchy** using PostgreSQL enums and Row Level Security policies. Roles determine what users can view, create, modify, and delete.
+
+## Role Definitions
+
+Roles are defined as a PostgreSQL enum type:
+
+```sql
+CREATE TYPE user_role AS ENUM ('admin', 'coordinadora', 'consulta');
+```
+
+This provides type safety at the database level and prevents invalid role assignments.
+
+---
+
+## Role Types
+
+<Accordion title="admin - System Administrator">
+
+### Permissions
+
+**Full System Access** - No restrictions
+
+<ParamField path="Catalog Management" type="Full Access">
+  - Create, edit, and delete suppliers
+  - Manage products and descriptions
+  - Configure presentations and destinations
+  - Modify status types and colors
+  - Update measurement units
+</ParamField>
+
+<ParamField path="Requisitions" type="Full Access">
+  - View all requisitions
+  - Create new requisitions
+  - Edit any requisition
+  - Delete requisitions (only role with this permission)
+  - Change requisition status
+</ParamField>
+
+<ParamField path="User Management" type="Full Access">
+  - View all user profiles
+  - Assign and change user roles
+  - Deactivate user accounts
+  - Manage user metadata
+</ParamField>
+
+<ParamField path="Audit Logs" type="Full Access">
+  - View complete change history
+  - Track user modifications
+  - Export audit reports
+</ParamField>
+
+### Use Cases
+
+- System configuration and maintenance
+- User role management
+- Critical data corrections
+- Compliance and audit oversight
+- Emergency data recovery
+
+### Security Considerations
+
+<Warning>
+  Admin role should be assigned sparingly:
+  - Only to IT administrators
+  - Management requiring full oversight
+  - Limited to 2-3 users maximum
+  - Enable audit logging for all admin actions
+</Warning>
+
+### Example SQL Operations
+
+```sql
+-- Admin can do everything
+INSERT INTO proveedores (nombre) VALUES ('Nuevo Proveedor');
+-- Success
+
+UPDATE products SET descripcion = 'Nueva descripción' WHERE id = 'prod-uuid';
+-- Success
+
+DELETE FROM requisiciones WHERE id = 'req-uuid';
+-- Success (only admin can delete)
+
+UPDATE profiles SET rol = 'coordinadora' WHERE id = 'user-uuid';
+-- Success (only admin can change roles)
+```
+
+</Accordion>
+
+<Accordion title="coordinadora - Procurement Coordinator">
+
+### Permissions
+
+**Operational Management** - Can manage requisitions but not system configuration
+
+<ParamField path="Catalog Management" type="Read Only">
+  - View all suppliers, products, etc.
+  - Cannot create or modify catalog items
+  - Request catalog changes from admin
+</ParamField>
+
+<ParamField path="Requisitions" type="Create & Edit">
+  - View all requisitions
+  - Create new requisitions
+  - Edit existing requisitions
+  - Update quantities and details
+  - Change requisition status
+  - **Cannot delete** requisitions
+</ParamField>
+
+<ParamField path="User Management" type="Read Only (Own Profile)">
+  - View and edit own profile
+  - Cannot view other users
+  - Cannot change roles
+</ParamField>
+
+<ParamField path="Audit Logs" type="Full Access">
+  - View complete change history
+  - Track modifications to requisitions
+  - Create audit entries when editing
+</ParamField>
+
+### Use Cases
+
+- Daily requisition creation
+- Status updates (pending → confirmed → received)
+- Tracking deliveries and shipments
+- Managing supplier orders
+- Coordinating with warehouse and production
+
+### Typical Workflow
+
+1. **Receive Request**: Get product request from production/warehouse
+2. **Create Requisition**: Enter details (supplier, product, quantity, destination)
+3. **Track Status**: Update as order progresses
+4. **Confirm Receipt**: Mark as received when delivered
+5. **Document Changes**: System logs all modifications
+
+### Example SQL Operations
+
+```sql
+-- Coordinadora can create requisitions
+INSERT INTO requisiciones (
+  fecha_recepcion, proveedor_id, producto_id,
+  presentacion_id, destino_id, estatus_id,
+  cantidad_solicitada, unidad_cantidad_id, created_by
+) VALUES (
+  '2026-03-20', 'prov-uuid', 'prod-uuid',
+  'pres-uuid', 'dest-uuid', 'est-uuid',
+  250.00, 'unit-uuid', auth.uid()
+);
+-- Success
+
+-- Coordinadora can update requisitions
+UPDATE requisiciones 
+SET 
+  estatus_id = (SELECT id FROM estatus WHERE nombre = 'Recibido'),
+  comentarios = 'Entregado completo'
+WHERE id = 'req-uuid';
+-- Success
+
+-- Coordinadora CANNOT delete
+DELETE FROM requisiciones WHERE id = 'req-uuid';
+-- Error: new row violates row-level security policy
+
+-- Coordinadora CANNOT modify catalogs
+INSERT INTO proveedores (nombre) VALUES ('Nuevo Proveedor');
+-- Error: new row violates row-level security policy
+```
+
+</Accordion>
+
+<Accordion title="consulta - Read-Only User">
+
+### Permissions
+
+**View Only** - Can see all data but cannot modify anything
+
+<ParamField path="Catalog Management" type="Read Only">
+  - View all suppliers
+  - View all products and descriptions
+  - View presentations, destinations, units
+  - View status types
+</ParamField>
+
+<ParamField path="Requisitions" type="Read Only">
+  - View all requisitions
+  - See complete requisition details
+  - Track order status
+  - View delivery dates and quantities
+  - **Cannot create, edit, or delete**
+</ParamField>
+
+<ParamField path="User Management" type="Read Only (Own Profile)">
+  - View own profile
+  - Update own name only
+  - Cannot view other users
+</ParamField>
+
+<ParamField path="Audit Logs" type="No Access">
+  - Cannot view change history
+  - Cannot see who made modifications
+  - No audit trail access
+</ParamField>
+
+### Use Cases
+
+- Warehouse staff checking incoming orders
+- Production teams viewing material availability
+- Finance/accounting reviewing procurement
+- Quality control checking ingredient sources
+- Management dashboards and reporting
+
+### Typical Workflow
+
+1. **Check Orders**: View requisitions for planning
+2. **Track Deliveries**: Monitor expected arrival dates
+3. **Verify Quantities**: Confirm order details
+4. **Report Issues**: Notify coordinators of discrepancies (via external communication)
+
+### Example SQL Operations
+
+```sql
+-- Consulta can view requisitions
+SELECT 
+  r.*,
+  prov.nombre as proveedor,
+  prod.nombre as producto,
+  est.nombre as estatus
+FROM requisiciones r
+JOIN proveedores prov ON prov.id = r.proveedor_id
+JOIN productos prod ON prod.id = r.producto_id
+JOIN estatus est ON est.id = r.estatus_id
+WHERE r.fecha_recepcion >= CURRENT_DATE
+ORDER BY r.fecha_recepcion;
+-- Success: Returns all upcoming requisitions
+
+-- Consulta can view catalogs
+SELECT * FROM productos WHERE activo = TRUE ORDER BY nombre;
+-- Success
+
+-- Consulta CANNOT create requisitions
+INSERT INTO requisiciones (...) VALUES (...);
+-- Error: new row violates row-level security policy
+
+-- Consulta CANNOT update anything
+UPDATE requisiciones SET comentarios = 'Test' WHERE id = 'req-uuid';
+-- Error: new row violates row-level security policy
+
+-- Consulta CANNOT view audit logs
+SELECT * FROM requisiciones_historial WHERE requisicion_id = 'req-uuid';
+-- Returns: 0 rows (blocked by RLS policy)
+```
+
+</Accordion>
+
+---
+
+## Permissions Matrix
+
+### Requisitions
+
+| Action | Admin | Coordinadora | Consulta |
+|--------|-------|--------------|----------|
+| View All Requisitions | ✓ | ✓ | ✓ |
+| Create Requisition | ✓ | ✓ | ✗ |
+| Edit Requisition | ✓ | ✓ | ✗ |
+| Delete Requisition | ✓ | ✗ | ✗ |
+| Update Status | ✓ | ✓ | ✗ |
+| Add Comments | ✓ | ✓ | ✗ |
+
+### Catalog Tables
+
+| Action | Admin | Coordinadora | Consulta |
+|--------|-------|--------------|----------|
+| View Catalogs | ✓ | ✓ | ✓ |
+| Add Supplier | ✓ | ✗ | ✗ |
+| Edit Product | ✓ | ✗ | ✗ |
+| Deactivate Item | ✓ | ✗ | ✗ |
+| Add Status Type | ✓ | ✗ | ✗ |
+| Configure Units | ✓ | ✗ | ✗ |
+
+### User Management
+
+| Action | Admin | Coordinadora | Consulta |
+|--------|-------|--------------|----------|
+| View All Users | ✓ | ✗ | ✗ |
+| View Own Profile | ✓ | ✓ | ✓ |
+| Edit Own Profile | ✓ | ✓ | ✓ |
+| Change User Roles | ✓ | ✗ | ✗ |
+| Create User | ✓ | ✗ | ✗ |
+| Deactivate User | ✓ | ✗ | ✗ |
+
+### Audit Logs
+
+| Action | Admin | Coordinadora | Consulta |
+|--------|-------|--------------|----------|
+| View Change History | ✓ | ✓ | ✗ |
+| Export Audit Logs | ✓ | ✓ | ✗ |
+| Create Audit Entry | ✓ (auto) | ✓ (auto) | ✗ |
+
+---
+
+## Role Assignment
+
+### Default Role
+
+New users are automatically assigned the `consulta` role:
+
+```sql
+CREATE TABLE profiles (
+  ...
+  rol user_role NOT NULL DEFAULT 'consulta',
+  ...
+);
+```
+
+This implements **secure by default** - new users have minimal permissions until explicitly granted more access.
+
+### Auto-Creation Trigger
+
+When a user signs up, their profile is automatically created:
+
+```sql
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, nombre_completo, rol)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'nombre_completo', NEW.email),
+    COALESCE((NEW.raw_user_meta_data->>'rol')::user_role, 'consulta')
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+```
+
+**Key Points:**
+- Uses metadata from signup if provided
+- Falls back to email as display name
+- Defaults to `consulta` role
+- Admin must upgrade role manually
+
+### Changing User Roles
+
+Only admins can change roles:
+
+```sql
+-- Admin promotes user to coordinadora
+UPDATE profiles 
+SET rol = 'coordinadora'
+WHERE id = 'user-uuid';
+-- Success (if admin), fails (if not admin)
+
+-- Admin promotes user to admin (careful!)
+UPDATE profiles 
+SET rol = 'admin'
+WHERE id = 'user-uuid';
+-- Success (if admin), fails (if not admin)
+```
+
+<Warning>
+  **Role changes take effect immediately** due to the `get_my_role()` function:
+  - User's next query will use new permissions
+  - May need to refresh application session
+  - No logout/login required
+</Warning>
+
+### Via Supabase Dashboard
+
+1. Navigate to **Table Editor** → **profiles**
+2. Find the user by email or name
+3. Edit the `rol` column
+4. Select: `admin`, `coordinadora`, or `consulta`
+5. Save changes
+
+---
+
+## Role Verification
+
+### Get Current User's Role
+
+The `get_my_role()` function is central to the RLS system:
+
+```sql
+CREATE OR REPLACE FUNCTION get_my_role()
+RETURNS user_role AS $$
+  SELECT rol FROM public.profiles WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+```
+
+**Usage:**
+
+```sql
+-- Check your current role
+SELECT get_my_role();
+-- Returns: 'admin' | 'coordinadora' | 'consulta'
+
+-- Check if you're an admin
+SELECT get_my_role() = 'admin' AS is_admin;
+-- Returns: true | false
+
+-- Check if you can edit requisitions
+SELECT get_my_role() IN ('admin', 'coordinadora') AS can_edit;
+-- Returns: true | false
+```
+
+### Via Application Code
+
+```typescript
+// Using Supabase client
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('rol')
+  .eq('id', user.id)
+  .single();
+
+const userRole = profile?.rol; // 'admin' | 'coordinadora' | 'consulta'
+
+// Or use the function directly
+const { data, error } = await supabase.rpc('get_my_role');
+const userRole = data; // 'admin' | 'coordinadora' | 'consulta'
+```
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Principle of Least Privilege">
+    Always assign the minimum role required:
+    
+    - Default new users to `consulta`
+    - Only promote to `coordinadora` when they need to create/edit
+    - Reserve `admin` for system administrators
+    - Regular users should rarely need more than `consulta`
+    
+    **Example Scenario:**
+    - Warehouse staff: `consulta` (just need to see incoming orders)
+    - Procurement team: `coordinadora` (create and track orders)
+    - IT/Management: `admin` (system configuration)
+  </Accordion>
+  
+  <Accordion title="Regular Role Audits">
+    Periodically review user roles:
+    
+    ```sql
+    -- List all users by role
+    SELECT 
+      p.rol,
+      COUNT(*) as user_count,
+      ARRAY_AGG(p.nombre_completo ORDER BY p.nombre_completo) as users
+    FROM profiles p
+    GROUP BY p.rol
+    ORDER BY p.rol;
+    ```
+    
+    Questions to ask:
+    - Do all admins still need admin access?
+    - Are there coordinators who should be demoted to consulta?
+    - Are there consulta users who now need coordinator access?
+  </Accordion>
+  
+  <Accordion title="Document Role Assignments">
+    Maintain documentation of who has what role and why:
+    
+    ```markdown
+    ## Current Admin Users (as of 2026-03-05)
+    
+    - Juan Pérez (IT Manager) - System administration
+    - María García (Operations Director) - Compliance oversight
+    
+    ## Coordinators
+    
+    - Luis Ramírez (Procurement) - Daily order management
+    - Ana Martínez (Procurement) - Backup coordinator
+    - Carlos López (Warehouse Manager) - Inventory coordination
+    ```
+  </Accordion>
+  
+  <Accordion title="Role Change Notifications">
+    Consider implementing notifications when roles change:
+    
+    ```sql
+    -- Trigger to log role changes
+    CREATE OR REPLACE FUNCTION log_role_change()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      IF OLD.rol IS DISTINCT FROM NEW.rol THEN
+        INSERT INTO requisiciones_historial (
+          requisicion_id, -- Or create separate audit table
+          campo_modificado,
+          valor_anterior,
+          valor_nuevo,
+          usuario_id
+        ) VALUES (
+          NEW.id,
+          'rol',
+          OLD.rol::TEXT,
+          NEW.rol::TEXT,
+          auth.uid()
+        );
+      END IF;
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql SECURITY DEFINER;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Common Scenarios
+
+### Onboarding a New Employee
+
+<Steps>
+  <Step title="Create Account">
+    New user signs up via application. Profile auto-created with `consulta` role.
+    
+    ```sql
+    -- Automatically happens via trigger
+    -- User can now login and view data
+    ```
+  </Step>
+  
+  <Step title="Verify Access">
+    User confirms they can view requisitions and catalogs.
+    
+    ```sql
+    SELECT * FROM requisiciones; -- Should work
+    ```
+  </Step>
+  
+  <Step title="Request Promotion (if needed)">
+    If user needs to create/edit, admin promotes them:
+    
+    ```sql
+    UPDATE profiles 
+    SET rol = 'coordinadora'
+    WHERE id = 'new-user-uuid';
+    ```
+  </Step>
+  
+  <Step title="Confirm Permissions">
+    User verifies they can now create requisitions:
+    
+    ```sql
+    INSERT INTO requisiciones (...) VALUES (...); -- Should work
+    ```
+  </Step>
+</Steps>
+
+### Employee Role Change
+
+<Steps>
+  <Step title="Identify Need">
+    Employee's responsibilities change (promotion, transfer, etc.)
+  </Step>
+  
+  <Step title="Update Role">
+    Admin changes role in database:
+    
+    ```sql
+    -- Promotion: consulta → coordinadora
+    UPDATE profiles SET rol = 'coordinadora' WHERE id = 'user-uuid';
+    
+    -- Demotion: coordinadora → consulta (rare)
+    UPDATE profiles SET rol = 'consulta' WHERE id = 'user-uuid';
+    ```
+  </Step>
+  
+  <Step title="Document Change">
+    Log the change and reason in internal documentation
+  </Step>
+  
+  <Step title="Notify User">
+    Inform user of their new permissions
+  </Step>
+</Steps>
+
+### Employee Departure
+
+<Steps>
+  <Step title="Deactivate Account">
+    Admin disables the user in Supabase Auth dashboard
+  </Step>
+  
+  <Step title="Preserve Data Integrity">
+    User's requisitions and audit logs remain intact:
+    
+    ```sql
+    -- Their requisitions are preserved
+    SELECT * FROM requisiciones WHERE created_by = 'departed-user-uuid';
+    
+    -- Their audit trail is preserved
+    SELECT * FROM requisiciones_historial WHERE usuario_id = 'departed-user-uuid';
+    ```
+  </Step>
+  
+  <Step title="Transfer Responsibilities">
+    Assign their active work to another coordinator (done manually)
+  </Step>
+</Steps>
+
+---
+
+## Troubleshooting
+
+<Accordion title="User Cannot Perform Expected Action">
+
+**Steps to debug:**
+
+1. **Verify role:**
+   ```sql
+   SELECT rol FROM profiles WHERE id = auth.uid();
+   ```
+
+2. **Check permissions matrix** (see above)
+
+3. **Test with SQL:**
+   ```sql
+   -- Try the exact operation that's failing
+   INSERT INTO requisiciones (...) VALUES (...);
+   -- Note the error message
+   ```
+
+4. **Common causes:**
+   - User is `consulta` but needs `coordinadora`
+   - User profile doesn't exist (rare)
+   - RLS policy not correctly configured
+
+</Accordion>
+
+<Accordion title="Role Changes Not Taking Effect">
+
+**Possible causes:**
+
+1. **Client-side cache:** Application hasn't refreshed user data
+   - Solution: User refreshes page or re-logs in
+
+2. **Wrong user ID:** Changed role for wrong profile
+   ```sql
+   -- Find user by email
+   SELECT p.id, p.nombre_completo, p.rol, u.email
+   FROM profiles p
+   JOIN auth.users u ON u.id = p.id
+   WHERE u.email = 'user@example.com';
+   ```
+
+3. **Database not updated:** Transaction didn't commit
+   ```sql
+   -- Verify current role
+   SELECT * FROM profiles WHERE id = 'user-uuid';
+   ```
+
+</Accordion>
+
+<Accordion title="get_my_role() Returns NULL">
+
+**Cause:** User profile doesn't exist.
+
+**Solution:**
+
+```sql
+-- Check if profile exists
+SELECT * FROM profiles WHERE id = auth.uid();
+
+-- Create if missing
+INSERT INTO profiles (id, nombre_completo, rol)
+VALUES (auth.uid(), 'User Name', 'consulta');
+
+-- Or manually trigger the function
+SELECT handle_new_user(); -- If applicable
+```
+
+</Accordion>
+
+---
+
+## Security Recommendations
+
+<Card title="Multi-Factor Authentication" icon="shield-keyhole">
+  Enable MFA for admin and coordinadora roles via Supabase Auth settings.
+</Card>
+
+<Card title="Regular Access Reviews" icon="clipboard-check">
+  Review user roles quarterly to ensure least privilege principle.
+</Card>
+
+<Card title="Audit Logging" icon="file-lines">
+  Monitor admin actions and role changes via `requisiciones_historial` or separate audit table.
+</Card>
+
+<Card title="Role Segregation" icon="users-between-lines">
+  Separate duties: procurement coordinators should not also be admins.
+</Card>
+
+---
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="RLS Policies" icon="shield-halved" href="/database/row-level-security">
+    See how roles are enforced via RLS
+  </Card>
+  <Card title="Tables Reference" icon="table" href="/database/tables">
+    View complete table schemas
+  </Card>
+  <Card title="Database Overview" icon="database" href="/database/overview">
+    Return to database architecture overview
+  </Card>
+</CardGroup>

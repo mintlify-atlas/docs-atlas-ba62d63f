@@ -1,0 +1,251 @@
+---
+title: Environment Variables
+description: Configure environment variables and application settings
+---
+
+## Overview
+
+The Cloro de Hidalgo Procurement System requires environment variables for Supabase integration. All configuration is managed through environment files.
+
+## Environment Files
+
+Create a `.env.local` file in the project root for local development:
+
+```bash
+touch .env.local
+```
+
+<Warning>
+Never commit `.env.local` to version control. It's already included in `.gitignore`.
+</Warning>
+
+## Required Variables
+
+### Supabase Configuration
+
+These variables are required for database and authentication:
+
+```env .env.local
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+<Steps>
+
+### Get Your Supabase Credentials
+
+1. Go to [supabase.com](https://supabase.com) and sign in
+2. Select your project (or create a new one)
+3. Navigate to **Settings** → **API**
+4. Copy the following values:
+   - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
+   - **Anon/Public Key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### Add to .env.local
+
+Paste the credentials into your `.env.local` file:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://xyzcompany.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### Verify Configuration
+
+Start the development server to verify:
+
+```bash
+npm run dev
+```
+
+If configured correctly, you'll see the login page without errors.
+
+</Steps>
+
+## Variable Details
+
+### NEXT_PUBLIC_SUPABASE_URL
+
+- **Type**: String (URL)
+- **Required**: Yes
+- **Description**: Your Supabase project URL
+- **Format**: `https://[project-id].supabase.co`
+- **Used in**:
+  - `lib/supabase/client.ts:5`
+  - `lib/supabase/server.ts:8`
+  - `lib/supabase/middleware.ts:10`
+
+<Note>
+The `NEXT_PUBLIC_` prefix exposes this variable to the browser, which is required for client-side Supabase operations.
+</Note>
+
+### NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+- **Type**: String (JWT)
+- **Required**: Yes
+- **Description**: Supabase anonymous/public API key
+- **Used in**:
+  - `lib/supabase/client.ts:6`
+  - `lib/supabase/server.ts:9`
+  - `lib/supabase/middleware.ts:11`
+
+<Warning>
+The anon key is safe to expose publicly. It's protected by Row Level Security (RLS) policies in Supabase.
+</Warning>
+
+## Usage in Code
+
+### Client-Side Usage
+
+In browser components (`lib/supabase/client.ts`):
+
+```typescript
+import { createBrowserClient } from '@supabase/ssr'
+
+export function createClient() {
+    return createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+}
+```
+
+### Server-Side Usage
+
+In Server Components and Actions (`lib/supabase/server.ts`):
+
+```typescript
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export async function createClient() {
+    const cookieStore = await cookies()
+
+    return createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                getAll() {
+                    return cookieStore.getAll()
+                },
+                setAll(cookiesToSet) {
+                    cookiesToSet.forEach(({ name, value, options }) =>
+                        cookieStore.set(name, value, options)
+                    )
+                },
+            },
+        }
+    )
+}
+```
+
+### Middleware Usage
+
+In Next.js middleware (`middleware.ts`):
+
+```typescript
+import { type NextRequest } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
+
+export async function middleware(request: NextRequest) {
+    return await updateSession(request)
+}
+```
+
+## Security Best Practices
+
+<Steps>
+
+### Never Commit Secrets
+
+Verify `.env.local` is in `.gitignore`:
+
+```bash
+cat .gitignore | grep .env.local
+```
+
+### Use Environment-Specific Files
+
+- **Development**: `.env.local`
+- **Production**: Configure in Vercel/deployment platform
+- **Testing**: `.env.test.local`
+
+### Rotate Keys Regularly
+
+For production environments:
+1. Generate new keys in Supabase dashboard
+2. Update environment variables in deployment platform
+3. Redeploy application
+
+### Use Service Role Key Sparingly
+
+<Warning>
+The service role key bypasses RLS. Only use it in secure server environments, never in client code.
+</Warning>
+
+</Steps>
+
+## Development vs Production
+
+### Local Development
+
+Use `.env.local`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://dev-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=dev_key...
+```
+
+### Production (Vercel)
+
+Set environment variables in Vercel dashboard:
+
+1. Go to Project Settings → Environment Variables
+2. Add each variable:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. Select environment: Production, Preview, Development
+4. Save and redeploy
+
+<Note>
+Vercel automatically makes `NEXT_PUBLIC_*` variables available to the browser.
+</Note>
+
+## Troubleshooting
+
+### "NEXT_PUBLIC_SUPABASE_URL is not defined"
+
+**Solution**:
+1. Verify `.env.local` exists in project root (not in subdirectory)
+2. Restart the development server after creating/modifying `.env.local`
+3. Check variable names are spelled correctly
+
+### Authentication Errors
+
+**Solution**:
+1. Verify keys match your Supabase dashboard
+2. Check for trailing spaces in `.env.local`
+3. Ensure you're using the **anon key**, not the service role key
+
+### Variables Not Loading
+
+**Solution**:
+```bash
+# Kill development server (Ctrl+C)
+# Clear Next.js cache
+rm -rf .next
+# Restart server
+npm run dev
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Supabase Setup" icon="database" href="/development/supabase-setup">
+    Configure database schema and RLS policies
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/development/deployment">
+    Deploy to production with Vercel
+  </Card>
+</CardGroup>

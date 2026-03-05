@@ -1,0 +1,485 @@
+---
+title: 'Administrator Guide'
+description: 'Complete guide for system administrators managing users, catalogs, and system configuration'
+icon: 'shield'
+---
+
+## Overview
+
+As a **System Administrator**, you have full control over the Cloro de Hidalgo Procurement System. Your role is critical for maintaining system integrity, managing user access, and ensuring that catalog data remains accurate and up-to-date.
+
+<Note>
+Administrators have unrestricted access to all system features, including user management, catalog administration, and full CRUD operations on requisitions.
+</Note>
+
+## Key Responsibilities
+
+<CardGroup cols={2}>
+  <Card title="User Management" icon="users">
+    Approve new user registrations, assign roles, and manage team member access levels
+  </Card>
+  <Card title="Catalog Administration" icon="book-open">
+    Maintain master data for suppliers, products, presentations, destinations, statuses, and units
+  </Card>
+  <Card title="System Configuration" icon="settings">
+    Configure system-wide settings and ensure data consistency
+  </Card>
+  <Card title="Audit & Oversight" icon="clipboard-list">
+    Monitor all requisitions, view audit trails, and maintain system compliance
+  </Card>
+</CardGroup>
+
+## User Management
+
+### Accessing the Admin Panel
+
+<Steps>
+  <Step title="Navigate to Admin Section">
+    From the dashboard sidebar, click on **"Administración"** to access the user management panel at `/dashboard/admin`
+  </Step>
+  
+  <Step title="Review Pending Requests">
+    The default view shows **"Solicitudes Pendientes"** - users awaiting approval. Each pending user displays:
+    - Full name and email address
+    - Registration date
+    - Action buttons for approval or rejection
+  </Step>
+</Steps>
+
+### Approving New Users
+
+When a new user registers, they are assigned the `pendiente` role and must wait for administrator approval.
+
+<Steps>
+  <Step title="Click Aprobar">
+    In the pending users list, click the **Aprobar** button next to the user you want to approve
+  </Step>
+  
+  <Step title="Select Role">
+    A modal will appear with four assignable roles:
+    - **Admin**: Full system access, user management, catalog administration
+    - **Coordinadora**: Create and manage requisitions, confirm delivery dates, communicate with suppliers
+    - **Laboratorio**: Technical validation, quality control, status updates (view/edit only)
+    - **CEDIS**: Receive deliveries, confirm inventory receipts, destination tracking (view/edit only)
+  </Step>
+  
+  <Step title="Confirm Approval">
+    Click **"Confirmar aprobación"** to activate the user with their assigned role
+  </Step>
+</Steps>
+
+<Tip>
+Choose roles carefully based on job function. Coordinadora roles can create requisitions, while Laboratorio and CEDIS roles have view and edit permissions but cannot create or delete entries.
+</Tip>
+
+### Rejecting User Requests
+
+If a registration is invalid or unauthorized:
+
+<Steps>
+  <Step title="Click Rechazar">
+    Click the **Rechazar** button next to the user's name
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    A warning dialog will appear. Click **"Sí, rechazar"** to permanently delete the account. The user will need to re-register if they want access.
+  </Step>
+</Steps>
+
+<Note>
+Rejected users are permanently deleted from the system. This action cannot be undone.
+</Note>
+
+### Managing Active Users
+
+Switch to the **"Usuarios Activos"** tab to manage existing team members.
+
+#### Changing User Roles
+
+<Steps>
+  <Step title="Locate User">
+    Find the user in the active users table, which displays name, email, current role, and registration date
+  </Step>
+  
+  <Step title="Click Cambiar">
+    Click the **"Cambiar"** dropdown button in the Actions column
+  </Step>
+  
+  <Step title="Select New Role">
+    Choose from Admin, Coordinadora, Laboratorio, or CEDIS. The change takes effect immediately.
+  </Step>
+</Steps>
+
+#### Deleting Active Users
+
+<Steps>
+  <Step title="Click Delete Icon">
+    Click the trash icon next to the user's role change button
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    A confirmation dialog will warn that this action is permanent and irreversible. Click **"Sí, eliminar usuario"** to proceed.
+  </Step>
+</Steps>
+
+<Warning>
+Deleting active users is permanent and will remove all their access. Use with caution.
+</Warning>
+
+## Catalog Administration
+
+### Accessing Catalogs
+
+Navigate to **"/dashboard/catalogos"** from the sidebar to access the Catalog Management interface.
+
+### Managing Catalog Entries
+
+The system maintains six core catalogs:
+
+<Accordion title="Proveedores (Suppliers)">
+  Manage supplier companies that provide materials.
+  
+  **Fields:**
+  - Nombre (Name): Company name
+  - Activo (Active): Toggle status
+  
+  **Common Tasks:**
+  - Add new suppliers using the **"+ Nuevo Proveedor"** button
+  - Edit existing suppliers by clicking the pencil icon
+  - Toggle active/inactive status by clicking the status badge
+  - Delete suppliers (only if not referenced in any requisition)
+</Accordion>
+
+<Accordion title="Productos (Products)">
+  Define raw materials and products to be ordered.
+  
+  **Fields:**
+  - Nombre (Name): Product name
+  - Descripción (Description): Optional details
+  - Activo (Active): Toggle status
+  
+  **Best Practices:**
+  - Use clear, descriptive product names
+  - Add descriptions for products that need clarification
+  - Mark obsolete products as inactive rather than deleting them
+</Accordion>
+
+<Accordion title="Presentaciones (Presentations)">
+  Define packaging types and formats.
+  
+  **Examples:** Bolsa, Tambor, Saco, Cubeta, Pallet
+  
+  **Fields:**
+  - Nombre (Name): Packaging type
+  - Activo (Active): Toggle status
+</Accordion>
+
+<Accordion title="Destinos (Destinations)">
+  Define delivery locations and warehouses.
+  
+  **Examples:** Planta Principal, CEDIS Norte, Laboratorio Central
+  
+  **Fields:**
+  - Nombre (Name): Location name
+  - Activo (Active): Toggle status
+</Accordion>
+
+<Accordion title="Estatus (Statuses)">
+  Define requisition workflow states.
+  
+  **Fields:**
+  - Nombre (Name): Status name
+  - Color HEX: Visual indicator color
+  - Activo (Active): Toggle status
+  
+  **Default Statuses:**
+  - Pendiente (Yellow): Awaiting confirmation
+  - Confirmado (Blue): Supplier confirmed delivery
+  - En Tránsito (Orange): Shipment in transit
+  - Recibido (Green): Delivery completed
+</Accordion>
+
+<Accordion title="Unidades (Units of Measure)">
+  Define measurement units for quantities.
+  
+  **Examples:** kg, L, pza, m³
+  
+  **Fields:**
+  - Nombre (Name): Full unit name
+  - Abreviatura (Abbreviation): Short form
+  - Activo (Active): Toggle status
+</Accordion>
+
+### Adding New Catalog Entries
+
+<Steps>
+  <Step title="Select Catalog Tab">
+    Click the appropriate tab (Proveedores, Productos, etc.)
+  </Step>
+  
+  <Step title="Click Nuevo Button">
+    Click the **"+ Nuevo [Catalog Type]"** button in the top-right corner
+  </Step>
+  
+  <Step title="Complete Form">
+    Fill in required fields:
+    - For most catalogs: Name only
+    - For Products: Name + optional Description
+    - For Statuses: Name + Color HEX code
+    - For Units: Name + Abbreviation
+  </Step>
+  
+  <Step title="Save">
+    Click **"Crear"** to save the new entry
+  </Step>
+</Steps>
+
+### Editing Catalog Entries
+
+<Steps>
+  <Step title="Locate Entry">
+    Find the entry in the catalog table
+  </Step>
+  
+  <Step title="Click Edit Icon">
+    Click the pencil icon in the Actions column
+  </Step>
+  
+  <Step title="Modify Fields">
+    Update the necessary information in the edit dialog
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **"Guardar"** to apply changes
+  </Step>
+</Steps>
+
+### Managing Active/Inactive Status
+
+<Note>
+Instead of deleting catalog entries that are in use, mark them as **Inactive** to preserve historical data integrity.
+</Note>
+
+<Steps>
+  <Step title="Toggle Show Inactive">
+    Use the **"Ver Inactivos"** switch in the top-right to show/hide inactive entries
+  </Step>
+  
+  <Step title="Click Status Badge">
+    Click the green "Activo" or red "Inactivo" badge to toggle status
+  </Step>
+</Steps>
+
+**Inactive entries:**
+- Remain available in existing requisitions (read-only)
+- Are hidden from dropdown menus when creating new requisitions
+- Can be reactivated at any time
+
+### Deleting Catalog Entries
+
+<Warning>
+Deletion is only possible for entries that are **not referenced** in any requisition. If an entry is in use, you'll receive an error suggesting you deactivate it instead.
+</Warning>
+
+<Steps>
+  <Step title="Click Delete Icon">
+    Click the trash icon next to the entry
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    Review the confirmation dialog and click **"Eliminar"** to permanently delete
+  </Step>
+</Steps>
+
+## Requisition Management
+
+### Full Access Permissions
+
+As an administrator, you can:
+
+✓ **Create** new requisitions from `/dashboard/requisiciones/nueva` or the calendar view  
+✓ **Edit** any requisition, including locked fields like "Fecha Confirmada"  
+✓ **Delete** requisitions (with confirmation)  
+✓ **View** complete audit trails showing all modifications  
+✓ **Filter** and search across all requisitions  
+
+### Key Administrative Tasks
+
+<Accordion title="Creating Requisitions">
+  While typically done by Coordinadoras, you can create requisitions when needed:
+  
+  1. Navigate to **"/dashboard/requisiciones"** or **"/dashboard/calendar"**
+  2. Click **"+ Nueva Requisición"**
+  3. Complete all required fields marked with *
+  4. Set the **Fecha Confirmada** (confirmed delivery date)
+  5. Click **"Generar Nueva Requisición"**
+</Accordion>
+
+<Accordion title="Editing Critical Fields">
+  Only Admins and Coordinadoras can edit the **Fecha Confirmada** field:
+  
+  1. Open a requisition by clicking the edit icon
+  2. Modify the **FECHA CONFIRMADA** field (highlighted in blue)
+  3. Save changes - an audit trail entry will be automatically created
+</Accordion>
+
+<Accordion title="Monitoring System Activity">
+  View requisition history and modifications:
+  
+  1. Click any requisition to open its detail modal
+  2. View all field values and current status
+  3. Check audit trail (if enabled) to see who changed what and when
+</Accordion>
+
+## Calendar Management
+
+The calendar view at `/dashboard/calendar` provides a visual overview of all deliveries.
+
+### Admin Calendar Features
+
+- **Color-coded events** based on status (Pendiente, Confirmado, En Tránsito, Recibido)
+- **Filter by status** using the legend in the top-right
+- **Filter by supplier, destination, or date range** using the sidebar
+- **Click any event** to view details and edit
+- **Create new requisitions** directly from the calendar
+
+### Using Filters Effectively
+
+<Steps>
+  <Step title="Access Sidebar Filters">
+    Use the right sidebar to filter requisitions by:
+    - Proveedor (Supplier)
+    - Destino (Destination)
+    - Estatus (Status)
+    - Date range
+  </Step>
+  
+  <Step title="Use Status Legend">
+    Click status badges in the legend to filter the calendar view by status
+  </Step>
+  
+  <Step title="View Upcoming Deliveries">
+    The sidebar shows upcoming deliveries sorted by date
+  </Step>
+</Steps>
+
+## System Configuration
+
+### Access Control
+
+As an admin, you control who can:
+- **Create** requisitions (Admin, Coordinadora)
+- **Edit** requisitions (Admin, Coordinadora, Laboratorio, CEDIS)
+- **Delete** requisitions (Admin, Coordinadora only)
+- **View only** (Laboratorio, CEDIS, Consulta)
+
+### Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Regular Catalog Maintenance" icon="broom">
+    Review catalogs monthly to:
+    - Remove duplicate entries
+    - Deactivate obsolete items
+    - Update supplier information
+    - Ensure color consistency in status labels
+  </Card>
+  
+  <Card title="User Access Reviews" icon="user-shield">
+    Quarterly review:
+    - Active user list
+    - Role assignments
+    - Pending requests
+    - Inactive accounts to remove
+  </Card>
+  
+  <Card title="Data Integrity Checks" icon="database">
+    Regularly verify:
+    - No orphaned requisitions
+    - Consistent unit usage
+    - Complete requisition data
+    - Accurate delivery tracking
+  </Card>
+  
+  <Card title="Communication Protocols" icon="message-circle">
+    Establish clear workflows:
+    - Who creates requisitions
+    - Who confirms dates
+    - Who updates delivery status
+    - Who receives notifications
+  </Card>
+</CardGroup>
+
+## Tips for Administrators
+
+<Tip>
+**Delegate Wisely**: Assign Coordinadora roles to trusted team members who manage supplier relationships. This reduces your workload while maintaining control.
+</Tip>
+
+<Tip>
+**Inactive Over Delete**: Always prefer marking catalog items as inactive rather than deleting. This preserves historical data and prevents broken references.
+</Tip>
+
+<Tip>
+**Regular Backups**: Although handled at the database level, confirm with your IT team that regular Supabase backups are configured.
+</Tip>
+
+<Tip>
+**Monitor Pending Approvals**: Check the admin panel daily to ensure new users aren't waiting unnecessarily for approval.
+</Tip>
+
+<Tip>
+**Use Filters**: When the requisition list grows large, use filters by date range, supplier, or status to find specific entries quickly.
+</Tip>
+
+## Common Troubleshooting
+
+<Accordion title="Cannot Delete Catalog Entry">
+  **Issue**: Error when trying to delete a supplier, product, or other catalog item.
+  
+  **Solution**: The entry is referenced in one or more requisitions. Instead of deleting:
+  1. Mark the entry as **Inactive**
+  2. It will remain available in historical records but hidden from new requisition forms
+</Accordion>
+
+<Accordion title="User Cannot Access System After Approval">
+  **Issue**: A newly approved user reports they still see the "pending" screen.
+  
+  **Solution**:
+  1. Ask the user to log out completely
+  2. Have them log back in
+  3. Their new role should now be active
+  4. If issue persists, verify their role in the "Usuarios Activos" tab
+</Accordion>
+
+<Accordion title="Requisition Missing from Calendar">
+  **Issue**: A requisition exists but doesn't appear on the calendar.
+  
+  **Solution**: Check that the requisition has a valid **Fecha Confirmada** (confirmed date). Only requisitions with confirmed dates appear on the calendar.
+</Accordion>
+
+<Accordion title="Color Not Showing Correctly">
+  **Issue**: Status colors appear incorrect or inconsistent.
+  
+  **Solution**:
+  1. Navigate to Catálogos → Estatus
+  2. Verify the HEX color code is correct (e.g., #4266ac)
+  3. Edit if needed and save
+  4. Refresh the page to see updated colors
+</Accordion>
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="Coordinator Guide" icon="users" href="/guides/coordinator-guide">
+    Learn how Coordinators create and manage requisitions
+  </Card>
+  <Card title="Laboratory Guide" icon="flask" href="/guides/laboratory-guide">
+    Understand technical validation workflows
+  </Card>
+  <Card title="CEDIS Guide" icon="warehouse" href="/guides/cedis-guide">
+    Review delivery receiving procedures
+  </Card>
+  <Card title="Catalog Management" icon="book-open" href="/features/catalogs">
+    Deep dive into catalog structure
+  </Card>
+</CardGroup>

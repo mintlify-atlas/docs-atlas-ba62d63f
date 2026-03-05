@@ -1,0 +1,379 @@
+---
+title: Supabase Setup
+description: Configure PostgreSQL database, authentication, and Row Level Security
+---
+
+## Overview
+
+The Cloro de Hidalgo Procurement System uses Supabase for:
+- **PostgreSQL Database**: All application data
+- **Authentication**: User management and sessions
+- **Row Level Security (RLS)**: Permission-based access control
+- **Realtime**: Live data updates (optional)
+
+## Prerequisites
+
+- Active Supabase account (free tier works)
+- Project created in Supabase dashboard
+- Environment variables configured (see [Environment Setup](/development/environment))
+
+## Database Schema Setup
+
+<Steps>
+
+### Access Supabase SQL Editor
+
+1. Open your Supabase project dashboard
+2. Navigate to **SQL Editor** in the left sidebar
+3. Click **New query**
+
+### Run the Schema Script
+
+The complete database schema is in `supabase/schema.sql`. Copy and paste the entire file into the SQL Editor.
+
+<Note>
+The schema file is approximately 300 lines and includes all tables, policies, triggers, and seed data.
+</Note>
+
+### Execute the Script
+
+Click **Run** to execute. You should see:
+- ✅ Tables created
+- ✅ Indexes created
+- ✅ RLS policies enabled
+- ✅ Seed data inserted
+
+</Steps>
+
+## Database Structure
+
+### Extensions
+
+```sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+```
+
+Enables UUID generation for primary keys.
+
+### Enums
+
+```sql
+CREATE TYPE user_role AS ENUM ('admin', 'coordinadora', 'consulta');
+```
+
+Defines available user roles:
+- **admin**: Full system access
+- **coordinadora**: Create/edit requisitions
+- **consulta**: Read-only access
+
+### Catalog Tables
+
+The system uses normalized catalog tables:
+
+| Table | Description | Key Fields |
+|-------|-------------|------------|
+| `proveedores` | Suppliers | `id`, `nombre`, `activo` |
+| `productos` | Raw materials/products | `id`, `nombre`, `descripcion` |
+| `presentaciones` | Packaging types | `id`, `nombre` |
+| `destinos` | Delivery locations | `id`, `nombre` |
+| `estatus` | Status types | `id`, `nombre`, `color_hex` |
+| `unidades` | Units of measure | `id`, `nombre`, `abreviatura` |
+
+All catalog tables include:
+- UUID primary key
+- `activo` boolean flag
+- `created_at` timestamp
+
+### Profiles Table
+
+Extends Supabase `auth.users` with application-specific data:
+
+```sql
+CREATE TABLE profiles (
+  id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  nombre_completo TEXT,
+  rol             user_role NOT NULL DEFAULT 'consulta',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**Auto-creation trigger**: Automatically creates profile when user signs up:
+
+```sql
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, nombre_completo, rol)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'nombre_completo', NEW.email),
+    COALESCE((NEW.raw_user_meta_data->>'rol')::user_role, 'consulta')
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+### Main Table: Requisiciones
+
+Core table for purchase requisitions:
+
+```sql
+CREATE TABLE requisiciones (
+  id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  fecha_recepcion      DATE NOT NULL,
+  proveedor_id         UUID NOT NULL REFERENCES proveedores(id),
+  producto_id          UUID NOT NULL REFERENCES productos(id),
+  presentacion_id      UUID NOT NULL REFERENCES presentaciones(id),
+  destino_id           UUID NOT NULL REFERENCES destinos(id),
+  estatus_id           UUID NOT NULL REFERENCES estatus(id),
+  cantidad_solicitada  NUMERIC(10, 2) NOT NULL CHECK (cantidad_solicitada > 0),
+  unidad_cantidad_id   UUID NOT NULL REFERENCES unidades(id),
+  numero_oc            TEXT,
+  comentarios          TEXT,
+  created_by           UUID NOT NULL REFERENCES auth.users(id),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**Indexes for performance**:
+
+```sql
+CREATE INDEX idx_requisiciones_fecha ON requisiciones(fecha_recepcion);
+CREATE INDEX idx_requisiciones_proveedor ON requisiciones(proveedor_id);
+CREATE INDEX idx_requisiciones_estatus ON requisiciones(estatus_id);
+CREATE INDEX idx_requisiciones_destino ON requisiciones(destino_id);
+```
+
+### Audit Table: Requisiciones Historial
+
+Tracks all changes to requisitions:
+
+```sql
+CREATE TABLE requisiciones_historial (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  requisicion_id    UUID NOT NULL REFERENCES requisiciones(id) ON DELETE CASCADE,
+  campo_modificado  TEXT NOT NULL,
+  valor_anterior    TEXT,
+  valor_nuevo       TEXT,
+  usuario_id        UUID NOT NULL REFERENCES auth.users(id),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+## Row Level Security (RLS)
+
+RLS policies enforce permission-based access at the database level.
+
+### Helper Function
+
+```sql
+CREATE OR REPLACE FUNCTION get_my_role()
+RETURNS user_role AS $$
+  SELECT rol FROM public.profiles WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+```
+
+Returns the current user's role for policy evaluation.
+
+### Profile Policies
+
+```sql
+-- View own profile
+CREATE POLICY "profiles: anyone can view own" ON profiles
+  FOR SELECT USING (id = auth.uid());
+
+-- Admin can view all profiles
+CREATE POLICY "profiles: admin can view all" ON profiles
+  FOR SELECT USING (get_my_role() = 'admin');
+
+-- Update own profile
+CREATE POLICY "profiles: user can update own" ON profiles
+  FOR UPDATE USING (id = auth.uid());
+
+-- Admin can manage all profiles
+CREATE POLICY "profiles: admin can manage all" ON profiles
+  FOR ALL USING (get_my_role() = 'admin');
+```
+
+### Catalog Policies
+
+All catalog tables have identical policies:
+
+```sql
+-- All authenticated users can read
+CREATE POLICY "[table]: all authenticated can select" ON [table]
+  FOR SELECT TO authenticated USING (TRUE);
+
+-- Only admin can write
+CREATE POLICY "[table]: admin full access" ON [table]
+  FOR ALL TO authenticated 
+  USING (get_my_role() = 'admin')
+  WITH CHECK (get_my_role() = 'admin');
+```
+
+### Requisiciones Policies
+
+```sql
+-- All authenticated users can read
+CREATE POLICY "requisiciones: all authenticated can select" ON requisiciones
+  FOR SELECT TO authenticated USING (TRUE);
+
+-- Admin and coordinadora can create
+CREATE POLICY "requisiciones: admin and coordinadora can insert" ON requisiciones
+  FOR INSERT TO authenticated
+  WITH CHECK (get_my_role() IN ('admin', 'coordinadora'));
+
+-- Admin and coordinadora can update
+CREATE POLICY "requisiciones: admin and coordinadora can update" ON requisiciones
+  FOR UPDATE TO authenticated
+  USING (get_my_role() IN ('admin', 'coordinadora'))
+  WITH CHECK (get_my_role() IN ('admin', 'coordinadora'));
+
+-- Only admin can delete
+CREATE POLICY "requisiciones: admin can delete" ON requisiciones
+  FOR DELETE TO authenticated
+  USING (get_my_role() = 'admin');
+```
+
+## Seed Data
+
+The schema includes initial data:
+
+### Status Values
+
+```sql
+INSERT INTO estatus (nombre, color_hex) VALUES
+  ('Pendiente',    '#F59E0B'),
+  ('Confirmado',   '#3B82F6'),
+  ('En Tránsito',  '#8B5CF6'),
+  ('Recibido',     '#10B981'),
+  ('Cancelado',    '#EF4444'),
+  ('En Revisión',  '#F97316');
+```
+
+### Units of Measure
+
+```sql
+INSERT INTO unidades (nombre, abreviatura) VALUES
+  ('Kilogramos',  'kg'),
+  ('Litros',      'L'),
+  ('Piezas',      'pzs'),
+  ('Toneladas',   'ton'),
+  ('Cajas',       'caj'),
+  ('Sacos',       'sac'),
+  ('Tambos',      'tam'),
+  ('Gramos',      'g');
+```
+
+### Sample Suppliers and Products
+
+Includes 5 sample suppliers and 8 sample products to get started.
+
+## Authentication Configuration
+
+<Steps>
+
+### Enable Email Authentication
+
+1. In Supabase dashboard, go to **Authentication** → **Providers**
+2. Enable **Email** provider
+3. Configure settings:
+   - Enable email confirmations (optional)
+   - Set redirect URLs
+
+### Configure Email Templates (Optional)
+
+1. Go to **Authentication** → **Email Templates**
+2. Customize:
+   - Confirmation email
+   - Password reset email
+   - Magic link email
+
+### Set Site URL
+
+1. Go to **Authentication** → **URL Configuration**
+2. Add your URLs:
+   - **Site URL**: `http://localhost:3000` (dev) or `https://yourdomain.com` (prod)
+   - **Redirect URLs**: Add `/dashboard/calendar` and other auth callback URLs
+
+</Steps>
+
+## Verify Setup
+
+### Check Tables
+
+In SQL Editor, run:
+
+```sql
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public'
+ORDER BY table_name;
+```
+
+You should see:
+- `destinos`
+- `estatus`
+- `presentaciones`
+- `productos`
+- `profiles`
+- `proveedores`
+- `requisiciones`
+- `requisiciones_historial`
+- `unidades`
+
+### Check RLS Policies
+
+```sql
+SELECT schemaname, tablename, policyname
+FROM pg_policies
+WHERE schemaname = 'public'
+ORDER BY tablename, policyname;
+```
+
+### Test Authentication
+
+1. Start your Next.js app
+2. Go to `/login`
+3. Create a test account
+4. Check Supabase dashboard → **Authentication** → **Users**
+5. Verify profile was auto-created in `profiles` table
+
+## Troubleshooting
+
+### "relation does not exist"
+
+**Solution**: Re-run the schema script. Make sure you're running it on the correct project.
+
+### RLS Policy Violations
+
+**Solution**: Check that RLS policies are enabled:
+
+```sql
+SELECT tablename, rowsecurity 
+FROM pg_tables 
+WHERE schemaname = 'public';
+```
+
+All tables should have `rowsecurity = true`.
+
+### User Can't Access Data
+
+**Solution**: 
+1. Verify user has a profile in `profiles` table
+2. Check their `rol` value
+3. Confirm they're authenticated (not anonymous)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Server Actions" icon="server" href="/development/server-actions">
+    Learn how to interact with Supabase from Next.js
+  </Card>
+  <Card title="Project Structure" icon="folder-tree" href="/development/project-structure">
+    Understand where database code lives
+  </Card>
+</CardGroup>

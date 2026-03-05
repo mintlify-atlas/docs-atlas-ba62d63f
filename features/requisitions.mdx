@@ -1,0 +1,438 @@
+---
+title: "Requisitions Management"
+description: "Complete guide to creating, managing, and tracking purchase requisitions in the Cloro de Hidalgo procurement system"
+---
+
+## Overview
+
+Requisitions are the core entity of the procurement system, representing purchase orders for raw materials and supplies. Each requisition tracks the complete lifecycle from order placement through delivery confirmation.
+
+<Info>
+Only users with **admin** or **coordinadora** roles can create and edit requisitions. All authenticated users can view requisitions based on their assigned permissions.
+</Info>
+
+## Requisition Data Structure
+
+The `Requisicion` type defines all fields tracked throughout the procurement lifecycle:
+
+```typescript types/index.ts
+export interface Requisicion {
+    id: string
+    fecha_recepcion: string
+    proveedor_id: string
+    producto_id: string
+    presentacion_id: string
+    destino_id: string
+    estatus_id: string
+    cantidad_solicitada: number
+    unidad_cantidad_id: string
+    numero_oc: string | null
+    requisicion_numero: string | null
+    fecha_oc: string | null
+    fecha_solicitada_entrega: string | null
+    fecha_confirmada: string | null
+    fecha_entregado: string | null
+    cantidad_entregada: number | null
+    factura_remision: string | null
+    comentarios: string | null
+    created_by: string
+    created_at: string
+    updated_at: string
+    // Joined relations
+    proveedor?: Proveedor
+    producto?: Producto
+    presentacion?: Presentacion
+    destino?: Destino
+    estatus?: Estatus
+    unidad_cantidad?: Unidad
+}
+```
+
+### Key Fields Explained
+
+<AccordionGroup>
+  <Accordion title="Order Information Fields">
+    - **numero_oc**: Purchase order number (Folio OC)
+    - **requisicion_numero**: Internal requisition reference number
+    - **fecha_oc**: Date when the purchase order was issued
+    - **fecha_recepcion**: Date when the requisition was received/created
+  </Accordion>
+
+  <Accordion title="Delivery Tracking Fields">
+    - **fecha_solicitada_entrega**: Requested delivery date from supplier
+    - **fecha_confirmada**: Confirmed delivery date (only editable by admin/coordinadora)
+    - **fecha_entregado**: Actual delivery date when goods were received
+  </Accordion>
+
+  <Accordion title="Quantity Tracking">
+    - **cantidad_solicitada**: Original quantity ordered
+    - **cantidad_entregada**: Actual quantity received
+    - **unidad_cantidad_id**: Unit of measure (kg, L, pcs, etc.)
+  </Accordion>
+</AccordionGroup>
+
+## Creating a New Requisition
+
+### User Interface
+
+The requisition form is organized into three logical sections:
+
+1. **Basic Order Data** - Manual entry fields for order numbers and dates
+2. **Material Details** - Catalog-based selection of supplier, product, presentation, destination, and status
+3. **Delivery Information** - Closure fields for actual delivery tracking
+
+<Steps>
+  <Step title="Access the Form">
+    Navigate to the Requisiciones page and click "Nueva Requisición" button (visible only to admin/coordinadora roles).
+  </Step>
+  
+  <Step title="Fill Required Fields">
+    Complete all fields marked with asterisk (*). The form uses catalog dropdowns with quick-add buttons for creating new catalog entries on-the-fly.
+  </Step>
+  
+  <Step title="Set Confirmed Date">
+    The **Fecha Confirmada** field determines when the requisition appears on the calendar. Only admin and coordinadora can set this field.
+  </Step>
+  
+  <Step title="Submit">
+    Click "Generar Nueva Requisición" to create the order. The system automatically records who created it and when.
+  </Step>
+</Steps>
+
+### Server Action Code
+
+The `createRequisicion` server action handles requisition creation with role validation:
+
+```typescript lib/actions/requisiciones.ts
+export async function createRequisicion(data: RequisicionFormData) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (!profile || !['admin', 'coordinadora'].includes(profile.rol)) {
+        return { error: 'No tienes permisos para crear requisiciones' }
+    }
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { error: 'Usuario no autenticado' }
+
+    const { data: result, error } = await supabase
+        .from('requisiciones')
+        .insert({
+            ...data,
+            created_by: user.id,
+        })
+        .select()
+        .single()
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/dashboard/calendar')
+    revalidatePath('/dashboard/requisiciones')
+    return { data: result }
+}
+```
+
+<Note>
+The system automatically revalidates both the calendar and table views after creating a requisition to ensure all pages display the latest data.
+</Note>
+
+## Editing Requisitions
+
+### Permissions
+
+- **Admin** and **Coordinadora** roles can edit all fields
+- Other roles have read-only access
+- The **Fecha Confirmada** field has special permissions (admin/coordinadora only)
+
+### Audit Trail Integration
+
+Every update generates audit records showing what changed, who changed it, and when:
+
+```typescript lib/actions/requisiciones.ts
+export async function updateRequisicion(
+    id: string,
+    data: Partial<RequisicionFormData>,
+    camposModificados: Array<{ campo: string; anterior: string; nuevo: string }>
+) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (!profile || !['admin', 'coordinadora'].includes(profile.rol)) {
+        return { error: 'No tienes permisos para editar requisiciones' }
+    }
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { error: 'Usuario no autenticado' }
+
+    const { data: result, error } = await supabase
+        .from('requisiciones')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single()
+
+    if (error) return { error: error.message }
+
+    // Write audit trail
+    if (camposModificados.length > 0) {
+        await supabase.from('requisiciones_historial').insert(
+            camposModificados.map((c) => ({
+                requisicion_id: id,
+                campo_modificado: c.campo,
+                valor_anterior: c.anterior,
+                valor_nuevo: c.nuevo,
+                usuario_id: user.id,
+            }))
+        )
+    }
+
+    revalidatePath('/dashboard/calendar')
+    revalidatePath('/dashboard/requisiciones')
+    return { data: result }
+}
+```
+
+The form automatically detects changed fields and creates audit records:
+
+```typescript components/forms/RequisicionForm.tsx
+const fields: Record<string, string> = {
+    fecha_recepcion: 'Fecha de Recepción',
+    proveedor_id: 'Proveedor',
+    producto_id: 'Producto',
+    presentacion_id: 'Presentación',
+    destino_id: 'Destino',
+    estatus_id: 'Estatus',
+    cantidad_solicitada: 'Cantidad Solicitada',
+    unidad_cantidad_id: 'Unidad de Medida',
+    // ... more fields
+}
+
+const modifications = Object.keys(values).reduce((acc, key) => {
+    const k = key as keyof RequisicionFormData
+    const newVal = String(values[k] ?? '')
+    const oldVal = String(initialData[k as keyof Requisicion] ?? '')
+
+    if (newVal !== oldVal) {
+        acc.push({
+            campo: fields[key] || key,
+            anterior: oldVal,
+            nuevo: newVal,
+        })
+    }
+    return acc
+}, [] as Array<{ campo: string; anterior: string; nuevo: string }>)
+```
+
+## Deleting Requisitions
+
+<Warning>
+Deletion is permanent and only available to **admin** and **coordinadora** roles. Related audit history is automatically deleted via database CASCADE.
+</Warning>
+
+```typescript lib/actions/requisiciones.ts
+export async function deleteRequisicion(id: string) {
+    const supabase = await createClient()
+    const profile = await getCurrentProfile()
+
+    if (!profile) {
+        return { error: 'Usuario no autenticado' }
+    }
+
+    if (profile.rol !== 'admin' && profile.rol !== 'coordinadora') {
+        return { error: 'Solo el administrador o la coordinadora pueden eliminar requisiciones' }
+    }
+
+    // CASCADE deletion handles requisiciones_historial automatically
+    const { error, count } = await supabase
+        .from('requisiciones')
+        .delete({ count: 'exact' })
+        .eq('id', id)
+
+    if (error) {
+        return { error: error.message }
+    }
+
+    if (count === 0) {
+        return { error: 'No se pudo eliminar el registro. Es posible que ya no exista o no tengas permisos suficientes.' }
+    }
+
+    revalidatePath('/dashboard/calendar')
+    revalidatePath('/dashboard/requisiciones')
+    return { success: true }
+}
+```
+
+## Filtering and Searching
+
+The system supports comprehensive filtering across multiple dimensions:
+
+```typescript types/index.ts
+export interface RequisicionFilters {
+    proveedor_id?: string      // Filter by supplier
+    destino_id?: string         // Filter by destination
+    estatus_id?: string         // Filter by status
+    fecha_desde?: string        // Start date range
+    fecha_hasta?: string        // End date range
+    search?: string             // Text search (future)
+}
+```
+
+### Query Implementation
+
+```typescript lib/actions/requisiciones.ts
+export async function getRequisiciones(filters?: RequisicionFilters) {
+    const supabase = await createClient()
+
+    let query = supabase
+        .from('requisiciones')
+        .select(`
+            *,
+            proveedor:proveedores(id, nombre),
+            producto:productos(id, nombre),
+            presentacion:presentaciones(id, nombre),
+            destino:destinos(id, nombre),
+            estatus:estatus(id, nombre, color_hex),
+            unidad_cantidad:unidades(id, nombre, abreviatura)
+        `)
+        .order('fecha_recepcion', { ascending: true })
+
+    if (filters?.proveedor_id) {
+        query = query.eq('proveedor_id', filters.proveedor_id)
+    }
+    if (filters?.destino_id) {
+        query = query.eq('destino_id', filters.destino_id)
+    }
+    if (filters?.estatus_id) {
+        query = query.eq('estatus_id', filters.estatus_id)
+    }
+    if (filters?.fecha_desde) {
+        query = query.gte('fecha_recepcion', filters.fecha_desde)
+    }
+    if (filters?.fecha_hasta) {
+        query = query.lte('fecha_recepcion', filters.fecha_hasta)
+    }
+
+    const { data, error } = await query
+
+    if (error) return { error: error.message }
+    return { data: data ?? [] }
+}
+```
+
+<Tip>
+The query uses Supabase's relational query syntax to join all catalog tables in a single request, reducing network round-trips and improving performance.
+</Tip>
+
+## Table View
+
+The requisitions table displays all active requisitions with smart sorting:
+
+```typescript app/dashboard/requisiciones/page.tsx
+const sortedData = [...(data as Requisicion[])].sort((a, b) => {
+    const isARecibido = a.estatus?.nombre === 'Recibido'
+    const isBRecibido = b.estatus?.nombre === 'Recibido'
+
+    // Push "Recibido" (received) items to bottom
+    if (isARecibido && !isBRecibido) return 1
+    if (!isARecibido && isBRecibido) return -1
+
+    // Secondary sort: by reception date
+    return new Date(a.fecha_recepcion).getTime() - new Date(b.fecha_recepcion).getTime()
+})
+```
+
+### Displayed Columns
+
+- **# Requi** - Internal requisition number
+- **Fecha Rec.** - Reception date
+- **FOLIO OC** - Purchase order number
+- **Proveedor** - Supplier name
+- **Producto** - Product with quantity and presentation
+- **Fecha Sol.** - Requested delivery date
+- **Fecha Conf.** - Confirmed delivery date
+- **Cant. Ent.** - Quantity delivered
+- **F. Entrega** - Actual delivery date
+- **Cant. Pend.** - Pending quantity (calculated)
+- **Estatus** - Color-coded status badge
+- **Destino** - Delivery destination
+- **Acciones** - View/Edit actions
+
+## Integration with Calendar
+
+Requisitions automatically appear on the calendar based on their confirmed delivery date:
+
+```typescript components/calendar/CalendarView.tsx
+const events: CalendarEvent[] = requisiciones.map(req => {
+    const eventColor = req.estatus?.color_hex || '#4266ac'
+    const title = req.producto?.nombre || 'S/P'
+    return {
+        id: req.id,
+        title,
+        start: req.fecha_confirmada || req.fecha_recepcion,
+        backgroundColor: eventColor,
+        borderColor: eventColor,
+        extendedProps: {
+            requisicion: req,
+            proveedor_nombre: req.proveedor?.nombre || 'N/A',
+            estatus_nombre: req.estatus?.nombre || 'N/A',
+            estatus_color: eventColor,
+        }
+    }
+})
+```
+
+<CardGroup cols={2}>
+  <Card title="Quick Add" icon="plus">
+    Create new catalog entries directly from the requisition form without navigating away
+  </Card>
+  <Card title="Real-time Updates" icon="refresh">
+    Changes to requisitions instantly reflect across calendar and table views
+  </Card>
+  <Card title="Permission-Based UI" icon="shield">
+    Form fields and actions automatically adjust based on user role
+  </Card>
+  <Card title="Data Validation" icon="check">
+    Zod schema validation ensures data integrity before submission
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Always Set Confirmed Date">
+    For requisitions to appear on the calendar, ensure the **Fecha Confirmada** is populated.
+  </Step>
+  
+  <Step title="Use Catalog Standardization">
+    Select from existing catalog entries rather than creating duplicates to maintain data consistency.
+  </Step>
+  
+  <Step title="Track Quantities Accurately">
+    Update **cantidad_entregada** when goods arrive to calculate pending quantities automatically.
+  </Step>
+  
+  <Step title="Add Meaningful Comments">
+    Use the comments field to document special instructions, delays, or issues for future reference.
+  </Step>
+</Steps>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Calendar View" icon="calendar" href="/features/calendar">
+    Visual scheduling and delivery planning
+  </Card>
+  <Card title="Catalog Management" icon="book" href="/features/catalogs">
+    Master data for suppliers, products, and more
+  </Card>
+  <Card title="Status Tracking" icon="list-check" href="/features/status-tracking">
+    Understanding the requisition lifecycle
+  </Card>
+  <Card title="Audit History" icon="clock-rotate-left" href="/features/audit-history">
+    Complete change tracking and accountability
+  </Card>
+</CardGroup>

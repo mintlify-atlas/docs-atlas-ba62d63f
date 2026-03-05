@@ -1,0 +1,555 @@
+---
+title: Components
+description: UI component library, form patterns, and reusable components
+---
+
+## Overview
+
+The Cloro de Hidalgo Procurement System uses a modern component architecture with:
+- **Shadcn UI**: Pre-built accessible components
+- **React Hook Form**: Type-safe form management
+- **Zod**: Schema validation
+- **FullCalendar**: Interactive calendar
+- **TanStack Table**: Advanced data tables
+- **Lucide React**: Icon library
+
+## UI Component Library (Shadcn)
+
+The system includes 19 pre-configured Shadcn UI components:
+
+```bash
+components/ui/
+├── button.tsx
+├── dialog.tsx
+├── input.tsx
+├── label.tsx
+├── select.tsx
+├── table.tsx
+├── textarea.tsx
+├── card.tsx
+├── dropdown-menu.tsx
+├── badge.tsx
+└── ... (9 more)
+```
+
+### Configuration
+
+Shadcn is configured in `components.json`:
+
+```json
+{
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui"
+  }
+}
+```
+
+### Usage Example
+
+```tsx
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
+export function ExampleComponent() {
+    return (
+        <Dialog open={true}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Add New Item</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                    <div>
+                        <Label htmlFor="name">Name</Label>
+                        <Input id="name" placeholder="Enter name" />
+                    </div>
+                    <Button>Save</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
+}
+```
+
+## Form Components
+
+Forms use React Hook Form with Zod validation for type safety.
+
+### Form Pattern
+
+Standard form implementation:
+
+```tsx
+'use client'
+
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { requisicionSchema, type RequisicionSchema } from '@/lib/validations/schemas'
+
+const form = useForm<RequisicionSchema>({
+    resolver: zodResolver(requisicionSchema),
+    defaultValues: {
+        fecha_recepcion: format(new Date(), 'yyyy-MM-dd'),
+        proveedor_id: '',
+        producto_id: '',
+        cantidad_solicitada: 0,
+    },
+})
+
+const onSubmit = async (data: RequisicionSchema) => {
+    const result = await createRequisicion(data)
+    if (result.error) {
+        toast.error(result.error)
+    } else {
+        toast.success('Requisición creada exitosamente')
+    }
+}
+```
+
+### RequisicionForm Component
+
+Located at `components/forms/RequisicionForm.tsx`, this is the main form for creating/editing requisitions.
+
+**Key features**:
+- React Hook Form integration
+- Zod schema validation
+- Dynamic catalog selects
+- Quick-add modal for new catalog entries
+- Optimistic UI updates
+- Error handling with toast notifications
+
+**Props**:
+
+```typescript
+interface RequisicionFormModalProps {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    initialData?: Requisicion | null
+    onSuccess?: () => void
+}
+```
+
+**Usage**:
+
+```tsx
+import { RequisicionFormModal } from '@/components/forms/RequisicionForm'
+
+const [isOpen, setIsOpen] = useState(false)
+
+<RequisicionFormModal
+    open={isOpen}
+    onOpenChange={setIsOpen}
+    initialData={selectedRequisicion}
+    onSuccess={() => {
+        setIsOpen(false)
+        refresh()
+    }}
+/>
+```
+
+### Form Fields
+
+#### Text Input
+
+```tsx
+<div>
+    <Label htmlFor="numero_oc">Número de OC</Label>
+    <Input
+        id="numero_oc"
+        {...form.register('numero_oc')}
+        placeholder="Ej: OC-2024-001"
+    />
+    {form.formState.errors.numero_oc && (
+        <p className="text-sm text-red-500">
+            {form.formState.errors.numero_oc.message}
+        </p>
+    )}
+</div>
+```
+
+#### Date Input
+
+```tsx
+<div>
+    <Label htmlFor="fecha_recepcion">Fecha de Recepción</Label>
+    <Input
+        id="fecha_recepcion"
+        type="date"
+        {...form.register('fecha_recepcion')}
+    />
+</div>
+```
+
+#### Number Input
+
+```tsx
+<div>
+    <Label htmlFor="cantidad">Cantidad Solicitada</Label>
+    <Input
+        id="cantidad"
+        type="number"
+        step="0.01"
+        {...form.register('cantidad_solicitada', { valueAsNumber: true })}
+    />
+</div>
+```
+
+#### Select Dropdown
+
+```tsx
+<div>
+    <Label htmlFor="proveedor_id">Proveedor</Label>
+    <Select
+        value={form.watch('proveedor_id')}
+        onValueChange={(value) => form.setValue('proveedor_id', value)}
+    >
+        <SelectTrigger>
+            <SelectValue placeholder="Selecciona un proveedor" />
+        </SelectTrigger>
+        <SelectContent>
+            {catalogos.proveedores.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                    {p.nombre}
+                </SelectItem>
+            ))}
+        </SelectContent>
+    </Select>
+</div>
+```
+
+#### Textarea
+
+```tsx
+<div>
+    <Label htmlFor="comentarios">Comentarios</Label>
+    <Textarea
+        id="comentarios"
+        {...form.register('comentarios')}
+        placeholder="Notas adicionales..."
+        rows={3}
+    />
+</div>
+```
+
+### Validation Schemas
+
+Defined in `lib/validations/schemas.ts`:
+
+```typescript
+import { z } from 'zod'
+
+export const requisicionSchema = z.object({
+    fecha_recepcion: z.string().min(1, 'La fecha es requerida'),
+    proveedor_id: z.string().uuid('Selecciona un proveedor'),
+    producto_id: z.string().uuid('Selecciona un producto'),
+    presentacion_id: z.string().uuid('Selecciona una presentación'),
+    destino_id: z.string().uuid('Selecciona un destino'),
+    estatus_id: z.string().uuid('Selecciona un estatus'),
+    cantidad_solicitada: z.number().positive('Debe ser mayor a 0'),
+    unidad_cantidad_id: z.string().uuid('Selecciona una unidad'),
+    numero_oc: z.string().optional().or(z.literal('')),
+    comentarios: z.string().optional().or(z.literal('')),
+})
+
+export type RequisicionSchema = z.infer<typeof requisicionSchema>
+```
+
+## Calendar Components
+
+Located in `components/calendar/`.
+
+### CalendarView
+
+Main calendar component using FullCalendar v6:
+
+```tsx
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
+
+export function CalendarView({ events }: { events: CalendarEvent[] }) {
+    return (
+        <FullCalendar
+            plugins={[dayGridPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
+            events={events}
+            eventClick={handleEventClick}
+            editable={true}
+            selectable={true}
+        />
+    )
+}
+```
+
+### EventModal
+
+Modal for viewing/editing calendar events:
+
+```tsx
+export function EventModal({
+    event,
+    open,
+    onOpenChange
+}: EventModalProps) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{event.title}</DialogTitle>
+                </DialogHeader>
+                {/* Event details */}
+            </DialogContent>
+        </Dialog>
+    )
+}
+```
+
+### Calendar Event Structure
+
+```typescript
+export interface CalendarEvent {
+    id: string
+    title: string
+    start: string
+    backgroundColor: string
+    borderColor: string
+    extendedProps: {
+        requisicion: Requisicion
+        proveedor_nombre: string
+        estatus_nombre: string
+        estatus_color: string
+    }
+}
+```
+
+## Layout Components
+
+Located in `components/layout/`.
+
+### Header
+
+Top navigation bar with:
+- Application logo
+- User menu
+- Sign out functionality
+
+```tsx
+export function Header() {
+    return (
+        <header className="border-b">
+            <div className="flex items-center justify-between px-6 py-4">
+                <h1 className="text-xl font-bold">Cloro de Hidalgo</h1>
+                <UserMenu />
+            </div>
+        </header>
+    )
+}
+```
+
+### Sidebar
+
+Left navigation with role-based menu items:
+
+```tsx
+export function Sidebar() {
+    const { role } = useAuthRole()
+    
+    return (
+        <aside className="w-64 border-r">
+            <nav className="space-y-2 p-4">
+                <NavLink href="/dashboard/calendar" icon={Calendar}>
+                    Calendario
+                </NavLink>
+                <NavLink href="/dashboard/requisiciones" icon={FileText}>
+                    Requisiciones
+                </NavLink>
+                {(role === 'admin' || role === 'coordinadora') && (
+                    <NavLink href="/dashboard/catalogos" icon={Database}>
+                        Catálogos
+                    </NavLink>
+                )}
+                {role === 'admin' && (
+                    <NavLink href="/dashboard/admin" icon={Users}>
+                        Administración
+                    </NavLink>
+                )}
+            </nav>
+        </aside>
+    )
+}
+```
+
+## Data Table Components
+
+Using TanStack Table v8 for advanced features:
+
+```tsx
+import {
+    useReactTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    getFilteredRowModel,
+} from '@tanstack/react-table'
+
+const table = useReactTable({
+    data: requisiciones,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+})
+```
+
+## Custom Hooks
+
+### useCatalogos
+
+Fetch and cache catalog data:
+
+```typescript
+import { useCatalogos } from '@/lib/hooks/useCatalogos'
+
+const { catalogos, loading, refresh } = useCatalogos()
+
+// Access catalogs
+catalogos.proveedores
+catalogos.productos
+catalogos.estatus
+```
+
+### useAuthRole
+
+Get current user role:
+
+```typescript
+import { useAuthRole } from '@/lib/hooks/useAuthRole'
+
+const { role, profile, loading } = useAuthRole()
+
+if (role === 'admin') {
+    // Show admin features
+}
+```
+
+## Icons
+
+Using Lucide React icons:
+
+```tsx
+import {
+    Calendar,
+    FileText,
+    Users,
+    Package,
+    Truck,
+    CheckCircle,
+    Clock,
+    Plus,
+    Edit,
+    Trash,
+} from 'lucide-react'
+
+<Button>
+    <Plus className="mr-2 h-4 w-4" />
+    Add New
+</Button>
+```
+
+## Toast Notifications
+
+Using Sonner for toast notifications:
+
+```tsx
+import { toast } from 'sonner'
+
+// Success
+toast.success('Requisición creada exitosamente')
+
+// Error
+toast.error('Error al guardar los datos')
+
+// Loading
+toast.loading('Guardando...')
+
+// With action
+toast('Se eliminó el registro', {
+    action: {
+        label: 'Deshacer',
+        onClick: () => console.log('Undo'),
+    },
+})
+```
+
+## Component Best Practices
+
+### Client vs Server Components
+
+By default, components are Server Components. Use `'use client'` when needed:
+
+```tsx
+'use client'  // Required for:
+              // - useState, useEffect
+              // - Event handlers
+              // - Browser APIs
+
+import { useState } from 'react'
+
+export function MyComponent() {
+    const [count, setCount] = useState(0)
+    return <button onClick={() => setCount(count + 1)}>{count}</button>
+}
+```
+
+### Component Organization
+
+```tsx
+// 1. Imports
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+
+// 2. Type definitions
+interface MyComponentProps {
+    title: string
+    onSave: () => void
+}
+
+// 3. Component
+export function MyComponent({ title, onSave }: MyComponentProps) {
+    // 4. State and hooks
+    const [isOpen, setIsOpen] = useState(false)
+    
+    // 5. Event handlers
+    const handleClick = () => {
+        setIsOpen(true)
+    }
+    
+    // 6. Render
+    return (
+        <div>
+            <h1>{title}</h1>
+            <Button onClick={handleClick}>Open</Button>
+        </div>
+    )
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Server Actions" icon="server" href="/development/server-actions">
+    Learn how to connect components to the database
+  </Card>
+  <Card title="Customization" icon="palette" href="/development/customization">
+    Customize themes and add new components
+  </Card>
+</CardGroup>

@@ -1,0 +1,466 @@
+---
+title: "Calendar View"
+description: "Visual scheduling and delivery planning with FullCalendar integration for the Cloro de Hidalgo procurement system"
+---
+
+## Overview
+
+The Calendar View provides a visual, time-based interface for managing delivery schedules. Built with FullCalendar, it displays requisitions as color-coded events based on their confirmed delivery dates and status.
+
+<Frame>
+  <img src="/images/calendar-preview.png" alt="Calendar view showing scheduled deliveries" />
+</Frame>
+
+<Info>
+Requisitions appear on the calendar based on their **fecha_confirmada** (confirmed date). If no confirmed date is set, the system falls back to **fecha_recepcion** (reception date).
+</Info>
+
+## FullCalendar Integration
+
+The calendar uses FullCalendar React with Spanish localization and multiple view options:
+
+```typescript components/calendar/CalendarView.tsx
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import esLocale from '@fullcalendar/core/locales/es'
+
+<FullCalendar
+    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+    initialView="dayGridMonth"
+    locales={[esLocale]}
+    locale="es"
+    headerToolbar={{
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek',
+    }}
+    events={events as any}
+    eventContent={renderEventContent}
+    eventClick={(info) => {
+        onEventClick(info.event.extendedProps.requisicion)
+    }}
+    dayMaxEvents={3}
+    height="100%"
+    contentHeight="auto"
+    aspectRatio={1.5}
+    buttonText={{
+        today: 'Hoy',
+        month: 'Mes',
+        week: 'Semana',
+    }}
+/>
+```
+
+### Configuration Highlights
+
+<AccordionGroup>
+  <Accordion title="View Options">
+    - **dayGridMonth**: Monthly calendar grid (default view)
+    - **timeGridWeek**: Weekly view with time slots
+    - Users can toggle between views using the header toolbar
+  </Accordion>
+
+  <Accordion title="Localization">
+    - Spanish locale for month/day names
+    - Custom button text: "Hoy", "Mes", "Semana"
+    - Date formatting follows Spanish conventions
+  </Accordion>
+
+  <Accordion title="Event Limits">
+    - **dayMaxEvents: 3** - Shows max 3 events per day cell
+    - Additional events shown via "+N more" link
+    - Prevents cell overflow in busy periods
+  </Accordion>
+</AccordionGroup>
+
+## Event Data Transformation
+
+Requisitions are transformed into FullCalendar events with custom styling:
+
+```typescript components/calendar/CalendarView.tsx
+const events: CalendarEvent[] = requisiciones.map(req => {
+    const eventColor = req.estatus?.color_hex || '#4266ac'
+    const title = req.producto?.nombre || 'S/P'
+    return {
+        id: req.id,
+        title,
+        start: req.fecha_confirmada || req.fecha_recepcion, // YYYY-MM-DD format
+        backgroundColor: eventColor,
+        borderColor: eventColor,
+        extendedProps: {
+            requisicion: req,
+            proveedor_nombre: req.proveedor?.nombre || 'N/A',
+            estatus_nombre: req.estatus?.nombre || 'N/A',
+            estatus_color: eventColor,
+        }
+    }
+})
+```
+
+### CalendarEvent Type
+
+```typescript types/index.ts
+export interface CalendarEvent {
+    id: string
+    title: string
+    start: string
+    backgroundColor: string
+    borderColor: string
+    extendedProps: {
+        requisicion: Requisicion
+        proveedor_nombre: string
+        estatus_nombre: string
+        estatus_color: string
+    }
+}
+```
+
+<Note>
+The `extendedProps` object stores the full requisition data, making it available when users click on events.
+</Note>
+
+## Color Coding by Status
+
+Each event's color is dynamically determined by its status:
+
+```typescript
+const eventColor = req.estatus?.color_hex || '#4266ac'
+```
+
+Common status colors:
+
+<CardGroup cols={3}>
+  <Card title="Pendiente" icon="clock">
+    <span style={{color: '#f59e0b'}}>Orange/Amber</span> - Awaiting confirmation
+  </Card>
+  <Card title="Confirmado" icon="check-circle">
+    <span style={{color: '#10b981'}}>Green</span> - Delivery confirmed
+  </Card>
+  <Card title="En Tránsito" icon="truck">
+    <span style={{color: '#3b82f6'}}>Blue</span> - In transit to destination
+  </Card>
+  <Card title="Recibido" icon="package-check">
+    <span style={{color: '#6b7280'}}>Gray</span> - Successfully delivered
+  </Card>
+  <Card title="Cancelado" icon="x-circle">
+    <span style={{color: '#ef4444'}}>Red</span> - Order cancelled
+  </Card>
+  <Card title="En Revisión" icon="search">
+    <span style={{color: '#8b5cf6'}}>Purple</span> - Under review
+  </Card>
+</CardGroup>
+
+## Custom Event Rendering
+
+Events are rendered with custom UI including status icons and supplier information:
+
+```typescript components/calendar/CalendarView.tsx
+const STATUS_ICONS: Record<string, LucideIcon> = {
+    'cancelado': XCircle,
+    'confirmado': CheckCircle2,
+    'en revisión': Search,
+    'en tránsito': Truck,
+    'pendiente': Clock,
+    'recibido': PackageCheck,
+}
+
+const renderEventContent = (eventInfo: any) => {
+    const { event } = eventInfo
+    const props = event.extendedProps
+    const color = props.estatus_color || '#4266ac'
+
+    // Convert hex to RGB for background transparency
+    const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+        return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '14, 12, 155'
+    }
+
+    const rgb = hexToRgb(color)
+    const StatusIcon = getStatusIcon(props.estatus_nombre)
+
+    return (
+        <div
+            className="flex flex-col w-full overflow-hidden rounded-[5px] cursor-pointer"
+            style={{
+                background: `rgba(${rgb}, 0.10)`,
+                borderLeft: `3px solid ${color}`,
+                padding: '3px 6px',
+            }}
+            title={`${event.title} · ${props.proveedor_nombre} (${props.estatus_nombre})`}
+        >
+            <div className="flex items-center gap-1 min-w-0">
+                <StatusIcon
+                    className="shrink-0"
+                    style={{ width: '10px', height: '10px', color: color }}
+                />
+                <div
+                    className="font-semibold leading-tight truncate"
+                    style={{ fontSize: '0.7rem', color: color, letterSpacing: '-0.01em' }}
+                >
+                    {event.title}
+                </div>
+            </div>
+            <div
+                className="truncate leading-snug"
+                style={{ fontSize: '0.63rem', color: '#64748b', marginTop: '1px', paddingLeft: '11px' }}
+            >
+                {props.proveedor_nombre}
+            </div>
+        </div>
+    )
+}
+```
+
+### Event Card Features
+
+<Steps>
+  <Step title="Status Icon">
+    Visual indicator matching the status type (clock, truck, checkmark, etc.)
+  </Step>
+  
+  <Step title="Product Name">
+    Displays in the status color with bold weight for emphasis
+  </Step>
+  
+  <Step title="Supplier Name">
+    Secondary text in muted gray below the product name
+  </Step>
+  
+  <Step title="Left Border">
+    3px colored border provides quick visual status identification
+  </Step>
+  
+  <Step title="Transparent Background">
+    10% opacity background tint in the status color
+  </Step>
+</Steps>
+
+## Interactive Features
+
+### Click to View Details
+
+Clicking any event opens a detailed modal with complete requisition information:
+
+```typescript app/dashboard/calendar/page.tsx
+<CalendarView
+    requisiciones={requisiciones}
+    isLoading={loading}
+    onEventClick={(req) => {
+        setSelectedReq(req)
+        setDetailOpen(true)
+    }}
+/>
+
+<EventDetailModal
+    open={detailOpen}
+    onOpenChange={setDetailOpen}
+    requisicion={selectedReq}
+    onEdit={(req) => {
+        setSelectedReq(req)
+        setFormOpen(true)
+    }}
+    onSuccess={loadData}
+/>
+```
+
+The modal displays:
+- Product name and supplier
+- Status badge with color
+- Reception and delivery dates
+- Quantity and unit of measure
+- Presentation and destination
+- Purchase order number
+- Comments and notes
+
+<Tip>
+Users with edit permissions see an "Editar" button in the modal to quickly modify requisition details.
+</Tip>
+
+## Sidebar Filters
+
+The calendar includes sidebar filters for refined views:
+
+```typescript app/dashboard/calendar/page.tsx
+const [filters, setFilters] = useState<RequisicionFilters>({})
+
+const loadData = async () => {
+    setLoading(true)
+    const { data, error } = await getRequisiciones(filters)
+    if (!error && data) {
+        setRequisiciones(data as Requisicion[])
+    }
+    setLoading(false)
+}
+
+useEffect(() => {
+    loadData()
+}, [filters])
+```
+
+### Available Filters
+
+<CardGroup cols={2}>
+  <Card title="By Supplier" icon="factory">
+    Filter deliveries from specific suppliers
+  </Card>
+  <Card title="By Destination" icon="map-pin">
+    Show only deliveries to selected locations
+  </Card>
+  <Card title="By Status" icon="list-check">
+    Filter by order status (Pendiente, Confirmado, etc.)
+  </Card>
+  <Card title="Date Range" icon="calendar-range">
+    Custom date range selection
+  </Card>
+</CardGroup>
+
+## Status Legend
+
+A visual legend helps users understand the color coding:
+
+```typescript components/calendar/StatusLegend.tsx
+// Component displays all active statuses with their colors
+// Users can click status badges to filter the calendar
+```
+
+<Info>
+Clicking a status in the legend automatically filters the calendar to show only requisitions with that status.
+</Info>
+
+## Upcoming Deliveries Widget
+
+The sidebar includes an "Upcoming Deliveries" widget showing the next scheduled deliveries:
+
+```typescript components/layout/UpcomingDeliveries.tsx
+// Displays next 5 deliveries sorted by confirmed date
+// Shows product, supplier, and days until delivery
+```
+
+## Loading States
+
+The calendar provides skeleton loaders during data fetching:
+
+```typescript components/calendar/CalendarView.tsx
+if (!mounted || isLoading) {
+    return (
+        <div className="h-full min-h-[500px] flex flex-col gap-2">
+            <div className="flex justify-between items-center mb-4">
+                <Skeleton className="h-10 w-48" />
+                <div className="flex gap-2">
+                    <Skeleton className="h-10 w-10" />
+                    <Skeleton className="h-10 w-10" />
+                    <Skeleton className="h-10 w-20" />
+                </div>
+            </div>
+            <div className="grid grid-cols-7 gap-2 h-full flex-1">
+                {Array.from({ length: 35 }).map((_, i) => (
+                    <Skeleton key={i} className="h-full w-full rounded-md min-h-[100px]" />
+                ))}
+            </div>
+        </div>
+    )
+}
+```
+
+## Responsive Design
+
+The calendar layout adapts to screen sizes:
+
+```typescript app/dashboard/calendar/page.tsx
+<div className="grid grid-cols-1 xl:grid-cols-4 gap-6 flex-1 min-h-0">
+    {/* Calendar takes 3 columns on large screens */}
+    <div className="xl:col-span-3 bg-[var(--card)] rounded-xl shadow-sm border p-4">
+        <CalendarView ... />
+    </div>
+
+    {/* Sidebar takes 1 column on large screens, full width on mobile */}
+    <div className="xl:col-span-1 space-y-4">
+        <SidebarFilters ... />
+        <UpcomingDeliveries />
+    </div>
+</div>
+```
+
+<Note>
+On mobile devices, the calendar switches to a stacked layout with filters and upcoming deliveries appearing below the calendar.
+</Note>
+
+## Performance Optimization
+
+### Client-Side Rendering
+
+The calendar is a client component to support FullCalendar's interactive features:
+
+```typescript
+'use client'
+
+import { useState, useEffect } from 'react'
+```
+
+### Mounted State Guard
+
+Prevents hydration mismatches:
+
+```typescript
+const [mounted, setMounted] = useState(false)
+
+useEffect(() => {
+    setMounted(true)
+}, [])
+
+if (!mounted || isLoading) {
+    return <SkeletonLoader />
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Set Confirmed Dates">
+    Ensure all requisitions have a **fecha_confirmada** for accurate calendar placement.
+  </Step>
+  
+  <Step title="Use Status Colors Consistently">
+    Maintain the standard color scheme across your organization for easy recognition.
+  </Step>
+  
+  <Step title="Review Upcoming Deliveries">
+    Check the sidebar widget daily to prepare for incoming shipments.
+  </Step>
+  
+  <Step title="Filter for Planning">
+    Use destination filters to plan receiving logistics for specific warehouses.
+  </Step>
+</Steps>
+
+## Integration Points
+
+<CardGroup cols={2}>
+  <Card title="Requisition Management" icon="file-text" href="/features/requisitions">
+    Create and edit requisitions that appear on the calendar
+  </Card>
+  <Card title="Status Tracking" icon="list-check" href="/features/status-tracking">
+    Status changes update event colors in real-time
+  </Card>
+  <Card title="Catalog Management" icon="book" href="/features/catalogs">
+    Supplier and product data shown on calendar events
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Event not appearing on calendar">
+    Verify the requisition has a **fecha_confirmada** set. If null, it uses **fecha_recepcion** as fallback.
+  </Accordion>
+
+  <Accordion title="Wrong event color">
+    Check the status catalog to ensure the correct color_hex value is assigned to the status.
+  </Accordion>
+
+  <Accordion title="Calendar not loading">
+    Ensure FullCalendar plugins are installed: `@fullcalendar/react`, `@fullcalendar/daygrid`, `@fullcalendar/timegrid`, `@fullcalendar/interaction`
+  </Accordion>
+</AccordionGroup>

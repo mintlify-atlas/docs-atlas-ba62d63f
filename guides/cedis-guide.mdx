@@ -1,0 +1,652 @@
+---
+title: 'CEDIS Guide'
+description: 'Complete guide for CEDIS personnel managing warehouse receipts, inventory tracking, and delivery confirmations'
+icon: 'warehouse'
+---
+
+## Overview
+
+As a **CEDIS (Centro de Distribución) team member**, you are responsible for receiving material deliveries, confirming inventory receipts, tracking destination routing, and reporting any discrepancies. You are the first point of contact when materials arrive at the facility.
+
+<Note>
+CEDIS users have **view and edit permissions** but cannot create new requisitions or delete existing ones. You can update delivery status, confirm quantities, and document receipt information.
+</Note>
+
+## Key Responsibilities
+
+<CardGroup cols={2}>
+  <Card title="Receiving Deliveries" icon="truck">
+    Accept and verify incoming material shipments against requisitions
+  </Card>
+  <Card title="Inventory Confirmation" icon="clipboard-check">
+    Confirm quantities received match order specifications
+  </Card>
+  <Card title="Destination Tracking" icon="map-pin">
+    Route materials to correct warehouse locations
+  </Card>
+  <Card title="Discrepancy Reporting" icon="alert-triangle">
+    Document and report any delivery issues or shortages
+  </Card>
+</CardGroup>
+
+## Accessing the System
+
+### Dashboard Overview
+
+After logging in, you have access to:
+
+- **Calendar** (`/dashboard/calendar`): Visual timeline of expected deliveries
+- **Requisiciones** (`/dashboard/requisiciones`): Table view of all purchase orders
+- **Catálogos** (`/dashboard/catalogos`): View-only access to suppliers and products
+
+<Note>
+You will **not** see the "Administración" option in the sidebar - that's reserved for Administrators.
+</Note>
+
+## Monitoring Expected Deliveries
+
+### Using the Calendar View
+
+The calendar at `/dashboard/calendar` shows all scheduled deliveries:
+
+<Steps>
+  <Step title="Navigate to Calendar">
+    Click **"Calendario"** in the sidebar to view `/dashboard/calendar`
+  </Step>
+  
+  <Step title="Check Today's Deliveries">
+    Today's date is highlighted. Click today to see expected arrivals.
+  </Step>
+  
+  <Step title="Review Upcoming Deliveries">
+    The **"Upcoming Deliveries"** panel on the right shows next 7 days of confirmed shipments
+  </Step>
+  
+  <Step title="Filter by Destination">
+    Use the sidebar filter to show only deliveries for your warehouse location
+  </Step>
+</Steps>
+
+### Calendar Color Codes
+
+Learn these status colors to quickly identify delivery stages:
+
+<CardGroup cols={2}>
+  <Card title="Pendiente" icon="clock">
+    🟡 Yellow - Not yet confirmed, may not arrive
+  </Card>
+  <Card title="Confirmado" icon="check">
+    🔵 Blue - Confirmed delivery, expect arrival
+  </Card>
+  <Card title="En Tránsito" icon="truck">
+    🟠 Orange - Shipment on the way, arriving soon
+  </Card>
+  <Card title="Recibido" icon="circle-check">
+    🟢 Green - Already received and confirmed
+  </Card>
+</CardGroup>
+
+<Tip>
+Focus on **Blue (Confirmado)** and **Orange (En Tránsito)** deliveries - these are the ones you should prepare to receive.
+</Tip>
+
+### Filtering for Your Warehouse
+
+If your facility has multiple CEDIS locations:
+
+<Steps>
+  <Step title="Use Destination Filter">
+    In the right sidebar, click the **Destino** dropdown
+  </Step>
+  
+  <Step title="Select Your Location">
+    Choose your warehouse (e.g., "CEDIS Norte", "CEDIS Principal", "Almacén Central")
+  </Step>
+  
+  <Step title="View Filtered Calendar">
+    Calendar now shows only deliveries for your location
+  </Step>
+</Steps>
+
+<Tip>
+Set this filter each morning so you only see deliveries relevant to your work area.
+</Tip>
+
+## Receiving a Delivery
+
+### Pre-Arrival Preparation
+
+When you see a delivery is **Confirmado** or **En Tránsito**:
+
+<Steps>
+  <Step title="Click the Event">
+    Click the calendar event to view full details
+  </Step>
+  
+  <Step title="Review Order Information">
+    Note:
+    - Supplier name
+    - Product name and description
+    - Expected quantity and unit
+    - Packaging type (Presentation)
+    - PO number (Folio OC)
+    - Special instructions in comments
+  </Step>
+  
+  <Step title="Prepare Receiving Area">
+    Clear space for the delivery and gather necessary tools (scale, forklift, pallet jack, etc.)
+  </Step>
+</Steps>
+
+### When the Truck Arrives
+
+<Steps>
+  <Step title="Verify Documentation">
+    Check driver's paperwork:
+    - Purchase Order matches system PO number
+    - Supplier invoice or packing slip
+    - Product description matches
+  </Step>
+  
+  <Step title="Inspect Physical Delivery">
+    Before unloading:
+    - Check packaging for damage
+    - Verify product labels match order
+    - Count packages/pallets
+  </Step>
+  
+  <Step title="Unload and Weigh/Count">
+    Physically verify:
+    - Actual quantity received
+    - Packaging condition
+    - Product integrity
+  </Step>
+  
+  <Step title="Compare to Requisition">
+    Open the requisition in the system and compare:
+    - Cantidad Solicitada (ordered) vs actual received
+    - Packaging type
+    - Any discrepancies
+  </Step>
+</Steps>
+
+### Updating the Requisition After Receipt
+
+<Steps>
+  <Step title="Locate the Requisition">
+    Find the order in calendar or table view using:
+    - Supplier name
+    - Product name
+    - PO number (Folio OC)
+    - Delivery date
+  </Step>
+  
+  <Step title="Click Edit">
+    Click the requisition, then click **"Editar"** button
+  </Step>
+  
+  <Step title="Update Delivery Information">
+    In the **"Información de Entrega"** section:
+    - **FECHA ENTREGADO**: Today's date
+    - **CANTIDAD ENTREGADA**: Actual quantity received (verify with physical count)
+  </Step>
+  
+  <Step title="Update Status">
+    Change **ESTATUS** based on situation:
+    - **"Recibido"** if delivery is complete and matches order
+    - Keep as **"En Tránsito"** if partial delivery with more coming
+    - Ask admin to create "Recibido Parcial" status for partial deliveries
+  </Step>
+  
+  <Step title="Add Receipt Notes">
+    In the **COMENTARIOS** field, document:
+    - Date and time received
+    - Who accepted delivery (your name)
+    - Warehouse location where stored
+    - Any damage or issues noted
+    - Carrier/driver information
+    - If Lab validation is needed
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **"Guardar Cambios"** to update the system
+  </Step>
+</Steps>
+
+<Note>
+Your updates create an automatic audit trail showing who received the delivery and when. This is important for compliance and traceability.
+</Note>
+
+## Handling Different Receipt Scenarios
+
+<Accordion title="Complete Delivery - Everything Matches">
+  **Scenario**: Delivery arrives, quantity matches order, no damage, all correct.
+  
+  **Action**:
+  1. Edit the requisition
+  2. Set **Fecha Entregado** to today
+  3. Set **Cantidad Entregada** to match **Cantidad Solicitada**
+  4. Change **Estatus** to "Recibido"
+  5. Add comment: "Received [date] by [your name]. Qty verified: [quantity]. Stored in [location]. No issues."
+  6. Save changes
+  7. Notify Laboratory if quality inspection is required
+  
+  Result: Requisition marked complete, material ready for use.
+</Accordion>
+
+<Accordion title="Partial Delivery">
+  **Scenario**: Ordered 500 kg, received only 400 kg. Supplier says remaining 100 kg coming next week.
+  
+  **Action**:
+  1. Edit the requisition
+  2. Keep **Cantidad Solicitada** at 500 (original order)
+  3. Set **Cantidad Entregada** to 400 (actual received)
+  4. Set **Fecha Entregado** to today
+  5. Change **Estatus** to "Recibido" (partial receipt still counts as received)
+  6. Add comment: "PARTIAL DELIVERY. Received 400 kg of 500 kg ordered. Supplier confirmed remaining 100 kg arriving [expected date]. Stored in [location]."
+  7. Save and notify Coordinator
+  
+  Result: System shows 100 kg pending (Cant. Pend. column). Coordinator can follow up or create new requisition for shortfall.
+</Accordion>
+
+<Accordion title="Over-Delivery">
+  **Scenario**: Ordered 500 kg, received 550 kg.
+  
+  **Action**:
+  1. Edit the requisition
+  2. Keep **Cantidad Solicitada** at 500
+  3. Set **Cantidad Entregada** to 550 (actual received)
+  4. Set **Fecha Entregado** to today
+  5. Change **Estatus** to "Recibido"
+  6. Add comment: "OVER-DELIVERY. Ordered 500 kg, received 550 kg. Extra 50 kg noted. Stored in [location]. Notified coordinator."
+  7. Save and immediately notify Coordinator and Purchasing
+  
+  Result: Coordinator can verify with supplier if extra quantity should be charged or returned.
+</Accordion>
+
+<Accordion title="Damaged Delivery">
+  **Scenario**: Packaging is damaged, product may be compromised.
+  
+  **Action**:
+  1. **DO NOT ACCEPT** if damage is severe
+  2. Take photos of damage
+  3. Note damage on carrier's delivery receipt
+  4. Edit the requisition:
+     - Set **Cantidad Entregada** to 0 if rejected, or actual usable quantity if partial acceptance
+     - Set **Fecha Entregado** to today (even if rejected)
+     - Keep **Estatus** as "En Tránsito" or change to custom "Dañado/Rechazado" status
+  5. Add detailed comment: "DAMAGED DELIVERY. [Description of damage]. Photos taken. Delivery rejected/partially accepted. Carrier: [name]. Notified coordinator immediately."
+  6. Save and **immediately call/email Coordinator**
+  
+  Result: Coordinator can file claim with carrier and arrange replacement from supplier.
+</Accordion>
+
+<Accordion title="Wrong Product Delivered">
+  **Scenario**: Ordered Product A, supplier sent Product B.
+  
+  **Action**:
+  1. **DO NOT ACCEPT** wrong product
+  2. Verify PO number on delivery papers matches requisition
+  3. If PO matches but product is wrong:
+     - Reject delivery
+     - Edit requisition: Set **Cantidad Entregada** to 0
+     - Add comment: "WRONG PRODUCT. Ordered [Product A], received [Product B]. Delivery rejected. Notified coordinator."
+  4. If PO doesn't match:
+     - May be a different order - check with Coordinator
+     - Don't update this requisition
+  5. Save and immediately notify Coordinator
+  
+  Result: Coordinator contacts supplier for correct product shipment.
+</Accordion>
+
+<Accordion title="Delivery Needs Lab Validation">
+  **Scenario**: Material arrives for production use that requires laboratory quality control.
+  
+  **Action**:
+  1. Physically receive and store the material in receiving area
+  2. Edit the requisition:
+     - Set **Fecha Entregado** to today (material physically arrived)
+     - Set **Cantidad Entregada** to received quantity
+     - Keep **Estatus** as "En Tránsito" (not fully received until Lab approves)
+  3. Add comment: "Received [date] by [your name]. Qty: [amount]. Awaiting Laboratory validation. Stored in receiving area [location]."
+  4. Save changes
+  5. Notify Laboratory team that material is ready for inspection
+  
+  Result: Laboratory will validate and update status to "Recibido" once approved.
+</Accordion>
+
+## Using the Table View
+
+The table view at `/dashboard/requisiciones` provides a spreadsheet-like interface:
+
+### Table View Benefits
+
+- **See all delivery details** in one screen
+- **Sort by date** to prioritize today's receipts
+- **Filter by status** to see only "Confirmado" or "En Tránsito" deliveries
+- **Track pending quantities** automatically calculated
+- **Quick access to actions** (view, edit) for each delivery
+
+### Key Columns for CEDIS Operations
+
+| Column | What It Means for You |
+|--------|----------------------|
+| **Fecha Conf.** | When delivery is expected to arrive |
+| **Proveedor** | Supplier name - verify with delivery papers |
+| **Producto** | What you should receive |
+| **Cant. Ent.** | Quantity received (blank if not yet delivered) |
+| **F. Entrega** | When you received and confirmed (blank if pending) |
+| **Cant. Pend.** | Outstanding quantity not yet received |
+| **Estatus** | Current delivery stage |
+| **Destino** | Your warehouse location |
+
+### Daily Receipt Checklist Using Table View
+
+<Steps>
+  <Step title="Morning Review">
+    Open table view, filter by:
+    - Destino: Your warehouse
+    - Estatus: "Confirmado" or "En Tránsito"
+    - Date: Today or this week
+  </Step>
+  
+  <Step title="Prepare for Arrivals">
+    Review the filtered list to see what deliveries to expect today
+  </Step>
+  
+  <Step title="End-of-Day Verification">
+    Filter by:
+    - Fecha Confirmada: Today
+    - Check that all expected deliveries have:
+      - Fecha Entregado filled in
+      - Cantidad Entregada recorded
+      - Estatus updated to "Recibido"
+  </Step>
+</Steps>
+
+<Tip>
+At end of day, if any "Confirmado" delivery for today is still blank in Fecha Entregado column, it means the delivery didn't arrive. Notify the Coordinator.
+</Tip>
+
+## Documentation Best Practices
+
+### Writing Effective Receipt Comments
+
+Good comments help everyone understand what happened:
+
+**Example 1 - Normal Receipt:**
+```
+2024-03-15 - Recibido por Carlos Mendoza
+- Proveedor: ABC Químicos
+- Cantidad verificada: 500 kg (coincide con orden)
+- Empaque: 10 sacos de 50 kg c/u, buen estado
+- Almacenado en: Bodega A, Rack 15
+- Transportista: Fletex, Chofer: Juan Pérez
+- Sin observaciones
+```
+
+**Example 2 - Partial Delivery:**
+```
+2024-03-15 - ENTREGA PARCIAL - Recibido por María López
+- Ordenado: 1000 L
+- Recibido: 600 L (40 tambores de 15L)
+- Faltante: 400 L
+- Proveedor confirmó que faltante llega 20-Mar
+- Almacenado en: CEDIS Norte, Zona B
+- COORDINADORA NOTIFICADA
+```
+
+**Example 3 - Damaged Delivery:**
+```
+2024-03-15 - RECHAZADO - Revisado por Pedro Sánchez
+- 3 de 20 sacos llegaron rotos, producto derramado
+- Fotos tomadas (ref: IMG_001-003)
+- Chofer firmó nota de rechazo
+- Solo 17 sacos aceptados = 425 kg (de 500 kg ordenados)
+- Almacenado: Área de inspección
+- COORDINADORA CONTACTADA INMEDIATAMENTE
+- Pendiente reposición de 75 kg
+```
+
+### Required Information in Comments
+
+Always include:
+
+✓ **Date and your name** - Who received and when  
+✓ **Quantity verified** - Actual count/weight  
+✓ **Storage location** - Where material was placed  
+✓ **Condition notes** - Any damage or quality concerns  
+✓ **Carrier info** - Trucking company and driver name  
+✓ **Notifications** - Who you informed about issues
+
+## Coordinating with Laboratory
+
+Many deliveries require laboratory validation before final approval:
+
+### Materials Typically Requiring Lab Validation
+
+- Raw materials for production
+- Chemicals and reagents
+- Materials with Certificate of Analysis (COA) requirements
+- Any material marked "Destino: Laboratorio"
+
+### CEDIS + Laboratory Workflow
+
+<Steps>
+  <Step title="CEDIS Receives Material">
+    You physically receive, count, and document the delivery
+  </Step>
+  
+  <Step title="Update System">
+    Edit requisition:
+    - Set Fecha Entregado (material arrived)
+    - Set Cantidad Entregada (physical count)
+    - Keep Estatus as "En Tránsito" (not yet approved)
+    - Add comment: "Awaiting Lab validation"
+  </Step>
+  
+  <Step title="Notify Laboratory">
+    Call/email Lab team: "Material [Product Name] from [Supplier] ready for inspection at [Location]"
+  </Step>
+  
+  <Step title="Lab Validates">
+    Laboratory performs quality control testing
+  </Step>
+  
+  <Step title="Lab Updates System">
+    Lab team edits requisition:
+    - Changes Estatus to "Recibido" if approved
+    - Adds quality validation results in comments
+  </Step>
+</Steps>
+
+<Note>
+You receive the material physically, but it's not considered "officially received" until Lab approves it. This is why Estatus stays "En Tránsito" until Lab validation.
+</Note>
+
+## Understanding Your Permissions
+
+### What You Can Do
+
+✓ **View** all requisitions in calendar and table views  
+✓ **Edit** requisitions to update delivery information  
+✓ **Update** Fecha Entregado, Cantidad Entregada, and Estatus  
+✓ **Add comments** documenting receipt details  
+✓ **View catalogs** to verify supplier and product information  
+✓ **Use filters** to focus on your warehouse location
+
+### What You Cannot Do
+
+✗ **Create** new requisitions (only Admin and Coordinator)  
+✗ **Delete** requisitions (only Admin and Coordinator)  
+✗ **Edit Fecha Confirmada** field (only Admin and Coordinator)  
+✗ **Modify catalogs** (only Admin)  
+✗ **Manage users** (only Admin)
+
+<Note>
+If you need a new requisition created or restricted fields changed, contact your Coordinator or Administrator.
+</Note>
+
+## Daily Workflow Recommendations
+
+### Morning Shift
+
+<Steps>
+  <Step title="Check Calendar">
+    Open `/dashboard/calendar` and review today's expected deliveries
+  </Step>
+  
+  <Step title="Filter by Location">
+    Apply Destino filter for your warehouse
+  </Step>
+  
+  <Step title="Review Upcoming Deliveries">
+    Check the sidebar for deliveries expected today (Confirmado or En Tránsito)
+  </Step>
+  
+  <Step title="Prepare Receiving Area">
+    Based on expected deliveries, prepare:
+    - Space for incoming materials
+    - Equipment (forklift, pallet jack, scale)
+    - Documentation (receiving logs, requisition printouts if needed)
+  </Step>
+</Steps>
+
+### During Shift (As Deliveries Arrive)
+
+<Steps>
+  <Step title="Verify Delivery Against Requisition">
+    Match physical delivery to system entry
+  </Step>
+  
+  <Step title="Inspect and Count">
+    Physical verification of quantity and condition
+  </Step>
+  
+  <Step title="Update System Immediately">
+    Edit requisition with actual received information
+  </Step>
+  
+  <Step title="Notify Stakeholders">
+    - Laboratory if validation needed
+    - Coordinator if issues/discrepancies
+  </Step>
+</Steps>
+
+### End of Shift
+
+<Steps>
+  <Step title="Switch to Table View">
+    Go to `/dashboard/requisiciones`
+  </Step>
+  
+  <Step title="Verify All Updates Complete">
+    Filter by today's date and confirm all expected deliveries are documented:
+    - Fecha Entregado filled in
+    - Cantidad Entregada recorded
+    - Estatus updated
+    - Comments added
+  </Step>
+  
+  <Step title="Report No-Shows">
+    If any "Confirmado" delivery didn't arrive, notify Coordinator
+  </Step>
+</Steps>
+
+## Tips for CEDIS Users
+
+<Tip>
+**Update Immediately**: As soon as delivery is unloaded and counted, update the system. Don't wait until end of shift - you might forget details.
+</Tip>
+
+<Tip>
+**Photos for Damage**: Take photos of any damaged deliveries before and after unloading. Reference photo names in comments.
+</Tip>
+
+<Tip>
+**Cross-Reference PO Numbers**: Always verify the PO number on delivery papers matches the Folio OC in the requisition.
+</Tip>
+
+<Tip>
+**Storage Location is Key**: Always document where you stored material. Production or Lab needs to find it quickly.
+</Tip>
+
+<Tip>
+**Use Table View for Tracking**: At end of week, use table view to verify all week's deliveries were properly documented.
+</Tip>
+
+<Tip>
+**Communicate Issues Fast**: If there's a problem (damage, shortage, wrong product), update system AND call Coordinator immediately. Don't just rely on system update.
+</Tip>
+
+## Viewing Catalog Data
+
+You have read-only access to catalogs at `/dashboard/catalogos`:
+
+### Why View Catalogs?
+
+- **Verify supplier names** to match delivery documentation
+- **Check product descriptions** to ensure correct material received
+- **Review destination codes** to route to correct warehouse area
+- **Understand presentation types** to verify packaging
+
+<Note>
+You cannot edit catalog entries. If you notice incorrect information (wrong supplier name, outdated product), notify your Coordinator or Administrator.
+</Note>
+
+## Troubleshooting Common Issues
+
+<Accordion title="Delivery Arrives but Not in System">
+  **Issue**: Truck arrives with material but you can't find the requisition.
+  
+  **Solution**:
+  1. Get PO number from delivery papers
+  2. Search table view for PO number (Folio OC column)
+  3. If not found, call Coordinator immediately
+  4. Coordinator may need to create requisition on the spot
+  5. DO NOT accept delivery without requisition - verify with Coordinator first
+</Accordion>
+
+<Accordion title="System Shows Delivered but You Never Received It">
+  **Issue**: Requisition shows "Recibido" status but material never arrived at your location.
+  
+  **Solution**:
+  1. Check if it was delivered to different CEDIS location (check Destino field)
+  2. Verify dates - may have been received on different day
+  3. Contact other CEDIS locations to see if they received it
+  4. If truly missing, notify Coordinator and Admin immediately
+  5. Do NOT change status yourself - let Coordinator investigate
+</Accordion>
+
+<Accordion title="Cannot Edit Fecha Confirmada">
+  **Issue**: Delivery date is wrong but field is locked.
+  
+  **Solution**: This is expected. Only Administrators and Coordinators can edit confirmed delivery dates. Contact your Coordinator to update it.
+</Accordion>
+
+<Accordion title="Quantity Math Doesn't Add Up">
+  **Issue**: Cantidad Pendiente column shows wrong calculation.
+  
+  **Solution**:
+  1. Verify you entered Cantidad Entregada correctly
+  2. Check that units match (don't mix kg and L)
+  3. Refresh the page
+  4. If still wrong, contact Administrator - may be a system calculation error
+</Accordion>
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="Laboratory Guide" icon="flask" href="/guides/laboratory-guide">
+    Understand quality validation workflows
+  </Card>
+  <Card title="Coordinator Guide" icon="calendar-check" href="/guides/coordinator-guide">
+    Learn how requisitions are created
+  </Card>
+  <Card title="Admin Guide" icon="shield" href="/guides/admin-guide">
+    System administration overview
+  </Card>
+  <Card title="Calendar Features" icon="calendar" href="/features/calendar">
+    Deep dive into calendar functionality
+  </Card>
+</CardGroup>

@@ -1,80 +1,379 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with the Cloro de Hidalgo Procurement System - from signup to creating your first requisition
 ---
 
-## Get started in three steps
+# Quickstart Guide
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide will walk you through the complete workflow: from signing up for an account to creating your first purchase requisition in the Cloro de Hidalgo Procurement System.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  **Prerequisites**: You need a valid company email address to register. All new accounts require approval from an administrator before gaining full access.
 </Note>
+
+## Step 1: Request Access
+
+Navigate to the login page and click on the **"Solicitar Acceso"** (Request Access) tab.
+
+<Steps>
+  <Step title="Fill out the registration form">
+    Provide your full name, company email, and create a password:
+    
+    ```typescript
+    // Registration form fields
+    {
+      nombre_completo: "Your Full Name",
+      email: "you@clorodehidalgo.com",
+      password: "******",
+      confirm_password: "******"
+    }
+    ```
+    
+    <Note>
+      Password must be at least 6 characters long.
+    </Note>
+  </Step>
+  
+  <Step title="Submit your request">
+    Click **"Solicitar Acceso"** to submit your registration. The system uses Supabase authentication:
+    
+    ```typescript
+    // From lib/actions/auth.ts:23-42
+    export async function signUp(formData: { 
+      email: string; 
+      password: string; 
+      nombre_completo: string 
+    }) {
+      const supabase = await createClient()
+      
+      const { error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            nombre_completo: formData.nombre_completo,
+          }
+        }
+      })
+      
+      if (error) {
+        return { error: error.message }
+      }
+      
+      revalidatePath('/', 'layout')
+      redirect('/dashboard/pendiente')
+    }
+    ```
+  </Step>
+  
+  <Step title="Wait for approval">
+    After successful registration, you'll see a confirmation message:
+    
+    > ¡Solicitud enviada! Un administrador revisará tu cuenta y te asignará acceso. Recibirás confirmación pronto.
+    
+    Your account is created with a **pendiente** (pending) role. An administrator must approve your account and assign you a proper role before you can access the system.
+  </Step>
+</Steps>
+
+## Step 2: Login After Approval
+
+Once your account is approved, you'll receive notification. Return to the login page:
+
+<Steps>
+  <Step title="Enter your credentials">
+    Use the email and password you registered with:
+    
+    ```typescript
+    // From lib/actions/auth.ts:7-21
+    export async function signIn(formData: { email: string; password: string }) {
+      const supabase = await createClient()
+      
+      const { error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      })
+      
+      if (error) {
+        return { error: error.message }
+      }
+      
+      revalidatePath('/', 'layout')
+      redirect('/dashboard/calendar')
+    }
+    ```
+  </Step>
+  
+  <Step title="Access the dashboard">
+    After successful login, you'll be redirected to `/dashboard/calendar` - the main calendar view.
+  </Step>
+</Steps>
+
+<Warning>
+  If you see an error like "Invalid login credentials", double-check your email and password. If you're still unable to login, contact your administrator to verify your account was approved.
+</Warning>
+
+## Step 3: Navigate the Dashboard
+
+The dashboard features several key sections:
+
+### Calendar View (Default Landing Page)
+
+The calendar displays all requisitions with confirmed delivery dates:
+
+```typescript
+// From app/dashboard/calendar/page.tsx:13-36
+export default function CalendarPage() {
+  const [requisiciones, setRequisiciones] = useState<Requisicion[]>([])
+  const [filters, setFilters] = useState<RequisicionFilters>({})
+  
+  const loadData = async () => {
+    setLoading(true)
+    const { data, error } = await getRequisiciones(filters)
+    if (!error && data) {
+      setRequisiciones(data as Requisicion[])
+    }
+    setLoading(false)
+  }
+  
+  // Calendar shows events based on fecha_confirmada
+  // ...
+}
+```
+
+**Features:**
+- Color-coded events by status
+- Click any event to view details
+- Filter by supplier, destination, status, or date range
+- Sidebar showing upcoming deliveries
+
+### Navigation Sidebar
+
+Use the sidebar to navigate between:
+- **Calendario** - Calendar view of confirmed deliveries
+- **Requisiciones** - Table view of all requisitions
+- **Nueva Requisición** - Create a new requisition (if you have permissions)
+- **Catálogos** - Manage suppliers, products, and other catalogs
+- **Admin** - User management (admin/coordinadora only)
+- **Configuración** - Your profile settings
+
+## Step 4: Create Your First Requisition
+
+<Note>
+  Only users with **admin** or **coordinadora** roles can create requisitions. If you don't see the "Nueva Requisición" option, you have a view-only role.
+</Note>
+
+<Steps>
+  <Step title="Navigate to Nueva Requisición">
+    Click **"Nueva Requisición"** in the sidebar, or go to `/dashboard/requisiciones/nueva`
+  </Step>
+  
+  <Step title="Fill in basic information">
+    The form is organized into several sections:
+    
+    **Section 1: Requisition Data (Manual Entry)**
+    - № REQUI - Requisition number (e.g., "F0000")
+    - FECHA DE OC - Purchase order date
+    - FOLIO OC - Purchase order folio (e.g., "GG-01000")
+    - FECHA SOLICITADA - Requested delivery date
+    - FECHA CONFIRMADA - Confirmed delivery date (required, appears on calendar)
+    - FACTURA / REMISIÓN - Invoice or remission number
+    
+    <Warning>
+      **FECHA CONFIRMADA** is required and can only be edited by admin or coordinadora roles. This is the date that appears on the calendar.
+    </Warning>
+  </Step>
+  
+  <Step title="Select catalog items">
+    **Section 2: Material Details (from Catalogs)**
+    
+    Choose from existing catalogs or use the **+** button to quickly add new items:
+    
+    - **PROVEEDOR** (Supplier) - Required
+    - **PRODUCTO** (Product) - Required  
+    - **PRESENTACIÓN** (Presentation) - Required
+    - **DESTINO** (Destination) - Required
+    - **ESTATUS** (Status) - Required
+    - **CANTIDAD Y UNIDAD** (Quantity and Unit) - Required
+    
+    ```typescript
+    // Quick add functionality from components/forms/RequisicionForm.tsx:322-326
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={() => setQuickAdd({ 
+        open: true, 
+        title: 'Proveedor', 
+        table: 'proveedores', 
+        field: 'proveedor_id' 
+      })}
+    >
+      <Plus className="h-3 w-3" />
+    </Button>
+    ```
+    
+    The **+** button opens a quick-add modal to create catalog entries on-the-fly without leaving the form.
+  </Step>
+  
+  <Step title="Add delivery information (optional)">
+    **Section 3: Delivery Information**
+    
+    - FECHA ENTREGADO - Actual delivery date (filled when received)
+    - CANTIDAD ENTREGADA - Actual quantity delivered
+  </Step>
+  
+  <Step title="Add comments (optional)">
+    Use the **COMENTARIOS / NOTAS** field for any additional instructions or notes about the requisition.
+  </Step>
+  
+  <Step title="Submit the form">
+    Click **"Generar Nueva Requisición"** to create the requisition:
+    
+    ```typescript
+    // From components/forms/RequisicionForm.tsx:146-220
+    const onSubmit = async (data: RequisicionSchema) => {
+      setIsSubmitting(true)
+      
+      // Sanitize empty strings to null
+      const values: RequisicionFormData = {
+        ...data,
+        fecha_oc: data.fecha_oc === '' ? null : data.fecha_oc,
+        fecha_solicitada_entrega: data.fecha_solicitada_entrega === '' ? null : data.fecha_solicitada_entrega,
+        // ... more fields
+      }
+      
+      const result = await createRequisicion(values)
+      
+      if (result?.error) {
+        toast.error('Error al guardar', { description: result.error })
+      } else {
+        toast.success('Requisición creada correctamente')
+        onOpenChange(false)
+        onSuccess?.()
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Step 5: View and Edit Requisitions
+
+### Calendar View
+
+Navigate to **Calendario** to see your requisition on the calendar (if it has a confirmed date):
+
+- Events are color-coded by status
+- Click an event to open the detail modal
+- Edit directly from the modal (if you have edit permissions)
+
+### Table View
+
+Navigate to **Requisiciones** for a complete table of all requisitions:
+
+- Sort by any column
+- Filter using the filter bar
+- Click any row to view/edit details
+- Export data if needed
+
+## Understanding Permissions
+
+Your role determines what actions you can perform:
+
+```typescript
+// From lib/hooks/useAuthRole.ts:81-86
+const canCreate = isAdmin || isCoordinadora
+const canEdit = isAdmin || isCoordinadora
+const canDelete = isAdmin || isCoordinadora
+const canViewOnly = isLaboratorio || isCedis || isConsulta
+const canManageUsers = isAdmin || isCoordinadora
+const canAccessAdmin = isAdmin || isCoordinadora
+```
+
+<CardGroup cols={2}>
+  <Card title="Admin / Coordinadora" icon="pencil">
+    - Create new requisitions
+    - Edit all requisitions
+    - Delete requisitions
+    - Manage catalogs
+    - Approve users
+    - Assign roles
+  </Card>
+  
+  <Card title="Laboratorio / CEDIS" icon="eye">
+    - View all requisitions
+    - View calendar
+    - Filter and search data
+    - No edit permissions
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<Steps>
+  <Step title="Learn about roles">
+    Read the [Authentication](/authentication) guide to understand role-based access control in depth
+  </Step>
+  
+  <Step title="Explore catalog management">
+    Navigate to **Catálogos** to manage suppliers, products, presentations, destinations, and status types
+  </Step>
+  
+  <Step title="Set up filters">
+    Use the filter sidebar to create custom views of your requisitions by supplier, destination, or status
+  </Step>
+</Steps>
+
+## Common Workflows
+
+### Creating a Requisition from Receipt
+
+1. Navigate to **Nueva Requisición**
+2. Enter the reception date (fecha_recepcion)
+3. Select supplier, product, and destination from catalogs
+4. Enter requested quantity and unit
+5. Leave delivery dates empty initially
+6. Submit to create
+
+### Updating Confirmed Delivery Date
+
+1. Find the requisition in calendar or table view
+2. Click to open detail modal
+3. Click **Edit** button
+4. Update **FECHA CONFIRMADA** field (admin/coordinadora only)
+5. Save changes - the calendar will update automatically
+
+### Marking a Requisition as Delivered
+
+1. Open the requisition detail
+2. Edit the requisition
+3. Fill in **FECHA ENTREGADO** (actual delivery date)
+4. Enter **CANTIDAD ENTREGADA** (actual quantity received)
+5. Add **FACTURA / REMISIÓN** number if applicable
+6. Update status to "Entregado" or similar
+7. Save changes
+
+<Note>
+  All changes are automatically tracked in the requisition history (historial) table for audit purposes.
+</Note>
+
+## Troubleshooting
+
+**Can't create requisitions?**
+- Verify your role is admin or coordinadora
+- Check with your administrator if you need elevated permissions
+
+**Requisition not appearing on calendar?**
+- Ensure the **FECHA CONFIRMADA** field is filled in
+- Check that your filters aren't hiding the event
+
+**Error when submitting form?**
+- Verify all required fields (marked with *) are filled
+- Check that you've selected valid catalog entries
+- Ensure dates are in the correct format
+
+## Support
+
+For additional help or to report issues:
+- Contact your system administrator
+- Check with the procurement coordination team
+- Review the authentication guide for role-related questions
